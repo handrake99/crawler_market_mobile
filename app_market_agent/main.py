@@ -9,6 +9,8 @@ from dotenv import load_dotenv
 # Import local modules
 from store_scraper import StoreScraper
 from ai_analyzer import AIAnalyzer
+from database import SessionLocal, engine
+import models
 
 load_dotenv()
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
@@ -77,43 +79,99 @@ class AppMarketAgent:
                 f.write(markdown_content)
 
     def run(self):
-        logging.info("Starting Daily App Market Analysis Cycle...")
+        import io
+        log_capture_string = io.StringIO()
+        ch = logging.StreamHandler(log_capture_string)
+        ch.setLevel(logging.INFO)
+        formatter = logging.Formatter('%(asctime)s - %(levelname)s - %(message)s')
+        ch.setFormatter(formatter)
         
-        # We need a large initial pool since we are filtering them later
-        target_store_apps = self.store_scraper.get_top_target_apps(max_pool_size=40)
-        
-        store_analysis_results = []
-        
-        # 2. 데이터 수집 및 AI 분석 생략 (LLM Filter Evaluation Only)
-        try:
-            for app in target_store_apps:
-                if len(store_analysis_results) >= 15:
-                    break
-                    
-                # --- V3/V4: LLM Filter Evaluation Only ---
-                evaluation = self.ai_analyzer.evaluate_app_potential(app)
-                if not evaluation.get("is_approved", False):
-                    logging.info(f"App {app.get('title')} rejected by LLM filter: {evaluation}")
-                    continue
-                
-                logging.info(f"App {app.get('title')} approved by LLM filter!")
-                
-                store_analysis_results.append({
-                    'app_metadata': app,
-                    'evaluation_reason': evaluation
-                })
-                 
-        except Exception as e:
-            if "token/quota limits" in str(e):
-                logging.error("🚨 CRITICAL: LLM Token/Quota Limit Exceeded. Halting execution immediately. No email will be sent.")
-                return # Abort the execution
-            else:
-                logging.error(f"Unexpected error during analysis loop: {e}")
+        root_logger = logging.getLogger()
+        root_logger.addHandler(ch)
 
-        # 4. 리포팅
-        report = self.generate_report_content(store_analysis_results)
-        self.send_email_report(report)
-        logging.info("Daily cycle completed.")
+        try:
+            logging.info("Starting Daily App Market Analysis Cycle...")
+            
+            target_store_apps = self.store_scraper.get_top_target_apps(max_pool_size=40)
+            store_analysis_results = []
+            
+            models.Base.metadata.create_all(bind=engine)
+            db = SessionLocal()
+            run_record = models.RunHistory()
+            db.add(run_record)
+            
+            try:
+                db.commit()
+                db.refresh(run_record)
+            except Exception as e:
+                logging.error(f"Failed to create RunHistory in DB: {e}")
+                db.rollback()
+                return
+                
+            try:
+                for app in target_store_apps:
+                    if len(store_analysis_results) >= 15:
+                        break
+                        
+                    evaluation = self.ai_analyzer.evaluate_app_potential(app)
+                    if not evaluation.get("is_approved", False):
+                        logging.info(f"App {app.get('title')} rejected by LLM filter: {evaluation}")
+                        continue
+                    
+                    logging.info(f"App {app.get('title')} approved by LLM filter!")
+                    
+                    app_item = models.AppItem(
+                        run_history_id=run_record.id,
+                        platform=app.get('platform', 'ios'),
+                        app_store_id=app.get('app_id', ''),
+                        title=app.get('title', ''),
+                        description=app.get('description', ''),
+                        price=app.get('price', ''),
+                        url=app.get('url', ''),
+                        source_keyword=app.get('source_keyword', ''),
+                        eval_niche_market=evaluation.get('niche_market', {}).get('reason', ''),
+                        eval_revenue_model=evaluation.get('revenue_model', {}).get('reason', ''),
+                        eval_simplicity=evaluation.get('simplicity', {}).get('reason', '')
+                    )
+                    db.add(app_item)
+                    
+                    store_analysis_results.append({
+                        'app_metadata': app,
+                        'evaluation_reason': evaluation
+                    })
+                    
+                run_record.total_apps_found = len(store_analysis_results)
+                run_record.log_output = log_capture_string.getvalue()
+                db.commit()
+                     
+            except Exception as e:
+                db.rollback()
+                if "token/quota limits" in str(e):
+                    logging.error("🚨 CRITICAL: LLM Token/Quota Limit Exceeded. Halting execution immediately. No email will be sent.")
+                    return
+                else:
+                    logging.error(f"Unexpected error during analysis loop: {e}")
+            finally:
+                db.close()
+
+            report = self.generate_report_content(store_analysis_results)
+            self.send_email_report(report)
+            logging.info("Daily cycle completed.")
+            
+        finally:
+            if 'run_record' in locals():
+                try:
+                    db2 = SessionLocal()
+                    db2.query(models.RunHistory).filter(models.RunHistory.id == run_record.id).update(
+                        {"log_output": log_capture_string.getvalue()}
+                    )
+                    db2.commit()
+                    db2.close()
+                except Exception:
+                    pass
+            
+            root_logger.removeHandler(ch)
+            log_capture_string.close()
 
 if __name__ == "__main__":
     agent = AppMarketAgent()

@@ -1,0 +1,389 @@
+<!DOCTYPE html>
+<html lang="ko">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>App Market Analyzer Dashboard</title>
+    <!-- Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- Vue.js 3 -->
+    <script src="https://unpkg.com/vue@3/dist/vue.global.js"></script>
+    <style>
+        /* Custom Monochrome Theme Adjustments */
+        body {
+            background-color: #f9fafb;
+            color: #111827;
+        }
+
+        .fade-enter-active,
+        .fade-leave-active {
+            transition: opacity 0.3s;
+        }
+
+        .fade-enter-from,
+        .fade-leave-to {
+            opacity: 0;
+        }
+    </style>
+</head>
+
+<body class="font-sans antialiased">
+    <div id="app" class="min-h-screen flex flex-col">
+        <!-- Header -->
+        <header class="bg-white border-b border-gray-200">
+            <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-16 flex items-center justify-between">
+                <h1 class="text-xl font-bold text-gray-900 cursor-pointer" @click="goHome">
+                    App Market Analyzer
+                </h1>
+                <nav class="flex space-x-4 text-sm text-gray-600">
+                    <span v-if="currentView !== 'run_list'" @click="goHome"
+                        class="hover:text-black cursor-pointer underline">목록으로 돌아가기</span>
+                </nav>
+            </div>
+        </header>
+
+        <!-- Main Content -->
+        <main class="flex-grow max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 w-full">
+
+            <!-- VIEW 1: Run History List -->
+            <transition name="fade" mode="out-in">
+                <div v-if="currentView === 'run_list'" key="runs">
+                    <div class="flex items-center justify-between mb-6">
+                        <h2 class="text-2xl font-bold text-gray-800">최근 분석 리포트 현황</h2>
+                        <button @click="triggerPipeline" :disabled="isRunningPipeline"
+                            class="bg-gray-800 hover:bg-black text-white font-bold py-2 px-4 rounded text-sm disabled:opacity-50 transition drop-shadow-sm">
+                            {{ isRunningPipeline ? '분석 실행 중...' : '신규 분석 강제 실행' }}
+                        </button>
+                    </div>
+                    <div class="bg-white shadow overflow-hidden sm:rounded-md border border-gray-200">
+                        <ul class="divide-y divide-gray-200">
+                            <li v-for="run in runs" :key="run.id">
+                                <a href="#" @click.prevent="openRun(run.id)"
+                                    class="block hover:bg-gray-50 p-4 sm:px-6 transition duration-150 ease-in-out">
+                                    <div class="flex items-center justify-between">
+                                        <p class="text-sm font-semibold text-gray-900 truncate">분석 회차 #{{ run.id }}</p>
+                                        <div class="ml-2 flex-shrink-0 flex">
+                                            <p
+                                                class="px-2 inline-flex text-xs leading-5 font-semibold rounded-full bg-gray-100 text-gray-800">
+                                                {{ run.total_apps_found }}개의 타겟 발견
+                                            </p>
+                                        </div>
+                                    </div>
+                                    <div class="mt-2 sm:flex sm:justify-between">
+                                        <div class="sm:flex">
+                                            <p class="flex items-center text-sm text-gray-500">
+                                                실행 일시: {{ formatDate(run.run_date) }}
+                                            </p>
+                                        </div>
+                                    </div>
+                                </a>
+                            </li>
+                            <li v-if="runs.length === 0" class="p-6 text-center text-gray-500">
+                                저장된 분석 내역이 없습니다. (파이프라인을 실행해주세요)
+                            </li>
+                        </ul>
+                    </div>
+                </div>
+
+                <!-- VIEW 2: App List for a Run -->
+                <div v-else-if="currentView === 'app_list'" key="apps">
+                    <div class="flex items-center justify-between mb-6">
+                        <div>
+                            <h2 class="text-2xl font-bold text-gray-800 inline-block mr-2">유망 타겟 앱 리스트</h2>
+                            <span class="text-sm text-gray-500">회차 #{{ selectedRunId }}</span>
+                        </div>
+                        <button @click="openRunLogs"
+                            class="bg-gray-200 hover:bg-gray-300 text-gray-800 font-bold py-2 px-4 rounded text-sm transition">
+                            Log 보기
+                        </button>
+                    </div>
+
+                    <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                        <div v-for="app in apps" :key="app.id"
+                            class="bg-white rounded-lg shadow border border-gray-200 p-5 flex flex-col hover:shadow-md transition">
+                            <div class="flex justify-between items-start mb-2">
+                                <h3 class="text-lg font-bold text-gray-900 line-clamp-1" :title="app.title">{{ app.title
+                                    }}</h3>
+                                <span class="bg-gray-800 text-white text-xs px-2 py-1 rounded">{{
+                                    app.platform.toUpperCase() }}</span>
+                            </div>
+                            <p class="text-xs text-gray-500 mb-3 truncate">출처: {{ app.source_keyword }} | ID: {{
+                                app.app_store_id }}</p>
+
+                            <p class="text-sm text-gray-600 mb-4 line-clamp-3 flex-grow">{{ app.description }}</p>
+
+                            <div
+                                class="bg-gray-50 rounded p-3 text-xs text-gray-700 mb-4 space-y-1 border border-gray-100">
+                                <p><span class="font-semibold">니치 마켓:</span> <span class="line-clamp-1"
+                                        :title="app.eval_niche_market">{{ app.eval_niche_market }}</span></p>
+                                <p><span class="font-semibold">수익 모델:</span> <span class="line-clamp-1"
+                                        :title="app.eval_revenue_model">{{ app.eval_revenue_model }}</span></p>
+                                <p><span class="font-semibold">단순성:</span> <span class="line-clamp-1"
+                                        :title="app.eval_simplicity">{{ app.eval_simplicity }}</span></p>
+                            </div>
+
+                            <button @click="openAppDetail(app)"
+                                class="w-full bg-black text-white py-2 rounded text-sm font-semibold hover:bg-gray-800 transition">
+                                상세 분석 보기
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            </transition>
+        </main>
+
+        <!-- VIEW 3: App Detail Modal -->
+        <div v-if="appDetailModalOpen" class="fixed inset-0 z-10 overflow-y-auto" aria-labelledby="modal-title"
+            role="dialog" aria-modal="true">
+            <div class="flex items-end justify-center min-h-screen pt-4 px-4 pb-20 text-center sm:block sm:p-0">
+                <div class="fixed inset-0 bg-gray-500 bg-opacity-75 transition-opacity"
+                    @click="appDetailModalOpen = false"></div>
+                <!-- Centering trick -->
+                <span class="hidden sm:inline-block sm:align-middle sm:h-screen" aria-hidden="true">&#8203;</span>
+
+                <div
+                    class="inline-block align-bottom bg-white rounded-lg text-left overflow-hidden shadow-xl transform transition-all sm:my-8 sm:align-middle sm:max-w-3xl w-full">
+                    <div class="bg-white px-4 pt-5 pb-4 sm:p-6 sm:pb-4">
+                        <div class="sm:flex sm:items-start">
+                            <div class="mt-3 text-center sm:mt-0 sm:ml-4 sm:text-left w-full">
+                                <div class="flex justify-between items-center mb-4">
+                                    <h3 class="text-2xl leading-6 font-bold text-gray-900" id="modal-title">
+                                        {{ selectedApp.title }}
+                                    </h3>
+                                    <!-- Collect Button -->
+                                    <button v-if="appDetailData.status === 'not_collected'" @click="collectDetail"
+                                        :disabled="isCollecting"
+                                        class="bg-black hover:bg-gray-800 text-white font-bold py-2 px-4 rounded text-sm disabled:opacity-50">
+                                        {{ isCollecting ? '수집 및 분석 중...' : '심층 분석 수집 시작' }}
+                                    </button>
+                                    <span v-else
+                                        class="text-xs bg-gray-100 text-gray-600 px-2 py-1 rounded border border-gray-200">
+                                        {{ formatDate(appDetailData.collection_date) }} 수집됨
+                                    </span>
+                                </div>
+
+                                <div class="mt-4">
+                                    <!-- State: Not Collected -->
+                                    <div v-if="appDetailData.status === 'not_collected' && !isCollecting"
+                                        class="text-center py-10 bg-gray-50 border border-dashed border-gray-300 rounded">
+                                        <p class="text-gray-500">아직 상세 리뷰 데이터가 수집되지 않았습니다.</p>
+                                        <p class="text-xs text-gray-400 mt-2">우측 상단의 [수집 시작] 버튼을 눌러 LLM 분석을 진행하세요.</p>
+                                    </div>
+
+                                    <!-- State: Collecting -->
+                                    <div v-else-if="isCollecting"
+                                        class="text-center py-10 bg-gray-50 border border-gray-200 rounded animate-pulse">
+                                        <p class="text-gray-600 font-semibold mb-2">리뷰 크롤링 및 LLM 분석을 수행하고 있습니다...</p>
+                                        <p class="text-xs text-gray-400">약 10~30초 정도 소요될 수 있습니다.</p>
+                                    </div>
+
+                                    <!-- State: Collected & Ready -->
+                                    <div v-else-if="appDetailData.status === 'collected'" class="space-y-6">
+                                        <div class="bg-gray-50 p-4 rounded border border-gray-200">
+                                            <h4 class="font-bold text-gray-800 mb-2 border-b border-gray-200 pb-1">🚨 유저
+                                                불만 사항 (Pain Points)</h4>
+                                            <p class="text-sm text-gray-700 whitespace-pre-wrap">{{
+                                                appDetailData.pain_points }}</p>
+                                        </div>
+
+                                        <div class="bg-gray-50 p-4 rounded border border-gray-200">
+                                            <h4 class="font-bold text-gray-800 mb-2 border-b border-gray-200 pb-1">💡 신규
+                                                기능 요구 (Requested Features)</h4>
+                                            <p class="text-sm text-gray-700 whitespace-pre-wrap">{{
+                                                appDetailData.requested_features }}</p>
+                                        </div>
+
+                                        <div>
+                                            <h4 class="font-bold text-gray-800 mb-2">원문 리뷰 샘플 (1~3점)</h4>
+                                            <div class="max-h-48 overflow-y-auto border border-gray-200 rounded">
+                                                <ul class="divide-y divide-gray-100">
+                                                    <li v-for="(review, index) in appDetailData.raw_reviews_data"
+                                                        :key="index" class="p-3 text-sm">
+                                                        <span class="font-bold text-gray-800 mr-2">⭐️ {{ review.rating
+                                                            }}</span>
+                                                        <span class="text-gray-600">{{ review.review }}</span>
+                                                    </li>
+                                                </ul>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="bg-gray-50 px-4 py-3 sm:px-6 sm:flex sm:flex-row-reverse">
+                        <button type="button"
+                            class="mt-3 w-full inline-flex justify-center rounded-md border border-gray-300 shadow-sm px-4 py-2 bg-white text-base font-medium text-gray-700 hover:bg-gray-50 focus:outline-none sm:mt-0 sm:ml-3 sm:w-auto sm:text-sm"
+                            @click="appDetailModalOpen = false">
+                            닫기
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- VIEW 4: Log Modal -->
+        <div v-if="logModalOpen" class="fixed inset-0 z-20 overflow-y-auto" aria-labelledby="modal-title" role="dialog"
+            aria-modal="true">
+            <div class="flex items-end justify-center min-h-screen pt-4 px-4 pb-20 text-center sm:block sm:p-0">
+                <div class="fixed inset-0 bg-gray-500 bg-opacity-75 transition-opacity" @click="logModalOpen = false">
+                </div>
+                <span class="hidden sm:inline-block sm:align-middle sm:h-screen" aria-hidden="true">&#8203;</span>
+                <div
+                    class="inline-block align-bottom bg-white rounded-lg text-left shadow-xl transform transition-all sm:my-8 sm:align-middle sm:max-w-4xl w-full flex flex-col max-h-[90vh]">
+                    <div class="bg-white px-4 pt-5 pb-4 sm:p-6 sm:pb-4 flex-shrink-0">
+                        <h3 class="text-lg leading-6 font-bold text-gray-900 mb-4">파이프라인 실행 전체 로그 (회차 #{{ selectedRunId
+                            }})</h3>
+                    </div>
+                    <div class="bg-gray-900 text-green-400 p-4 font-mono text-xs overflow-y-auto flex-grow whitespace-pre-wrap border-y border-gray-700 m-0 rounded-none w-full text-left"
+                        style="min-height: 50vh;">
+                        {{ runLogData }}
+                    </div>
+                    <div class="bg-gray-50 px-4 py-3 sm:px-6 sm:flex sm:flex-row-reverse flex-shrink-0">
+                        <button type="button"
+                            class="mt-3 w-full inline-flex justify-center rounded-md border border-gray-300 shadow-sm px-4 py-2 bg-white text-base font-medium text-gray-700 hover:bg-gray-50 focus:outline-none sm:text-sm"
+                            @click="logModalOpen = false">
+                            닫기
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+    </div>
+
+    <script>
+        const { createApp } = Vue
+
+        const API_BASE = 'http://127.0.0.1:9000/api';
+
+        createApp({
+            data() {
+                return {
+                    currentView: 'run_list', // 'run_list', 'app_list'
+                    runs: [],
+                    apps: [],
+                    selectedRunId: null,
+
+                    selectedApp: null,
+                    appDetailModalOpen: false,
+                    appDetailData: { status: 'not_collected' },
+                    isCollecting: false,
+                    isRunningPipeline: false,
+
+                    logModalOpen: false,
+                    runLogData: ''
+                }
+            },
+            mounted() {
+                this.fetchRuns();
+            },
+            methods: {
+                goHome() {
+                    this.currentView = 'run_list';
+                    this.selectedRunId = null;
+                    this.fetchRuns();
+                },
+                formatDate(dateString) {
+                    if (!dateString) return '';
+                    const d = new Date(dateString);
+                    return d.toLocaleString('ko-KR', { year: 'numeric', month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit' });
+                },
+                async fetchRuns() {
+                    try {
+                        const res = await fetch(`${API_BASE}/viewlist`);
+                        this.runs = await res.json();
+                    } catch (e) {
+                        console.error("Failed to fetch runs", e);
+                    }
+                },
+                async openRun(runId) {
+                    this.selectedRunId = runId;
+                    this.currentView = 'app_list';
+                    try {
+                        const res = await fetch(`${API_BASE}/viewapplist?run_id=${runId}`);
+                        this.apps = await res.json();
+                    } catch (e) {
+                        console.error("Failed to fetch app list", e);
+                    }
+                },
+                async openAppDetail(app) {
+                    this.selectedApp = app;
+                    this.appDetailData = { status: 'not_collected' };
+                    this.appDetailModalOpen = true;
+                    this.isCollecting = false;
+
+                    try {
+                        const res = await fetch(`${API_BASE}/viewappinfo?app_id=${app.id}`);
+                        this.appDetailData = await res.json();
+                    } catch (e) {
+                        console.error("Failed to fetch app info", e);
+                    }
+                },
+                async collectDetail() {
+                    if (!this.selectedApp) return;
+                    this.isCollecting = true;
+                    try {
+                        const res = await fetch(`${API_BASE}/collect_detail?app_id=${this.selectedApp.id}`, {
+                            method: 'POST'
+                        });
+                        const result = await res.json();
+
+                        if (result.status === 'success') {
+                            // Fetch updated info
+                            const infoRes = await fetch(`${API_BASE}/viewappinfo?app_id=${this.selectedApp.id}`);
+                            this.appDetailData = await infoRes.json();
+                        } else {
+                            alert("수집 실패: " + result.detail);
+                        }
+                    } catch (e) {
+                        alert("API 호출 중 오류가 발생했습니다.");
+                        console.error(e);
+                    } finally {
+                        this.isCollecting = false;
+                    }
+                },
+                async triggerPipeline() {
+                    this.isRunningPipeline = true;
+                    try {
+                        const res = await fetch(`${API_BASE}/run_pipeline`, {
+                            method: 'POST'
+                        });
+                        const result = await res.json();
+
+                        if (result.status === 'success') {
+                            alert("백그라운드에서 신규 앱 수집 및 AI 분석이 시작되었습니다.\n완료까지 대략 2~3분이 소요될 수 있으므로, 잠시 후 다시 목록을 새로고침 해주세요.");
+                        } else {
+                            alert("실행 실패: " + result.detail);
+                            this.isRunningPipeline = false;
+                        }
+                    } catch (e) {
+                        alert("API 서버 통신 오류가 발생했습니다.");
+                        console.error(e);
+                        this.isRunningPipeline = false;
+                    }
+                    // Keep isRunningPipeline true visually so they don't click it again immediately.
+                    // If they refresh the page, it resets.
+                    setTimeout(() => {
+                        this.isRunningPipeline = false;
+                    }, 180000); // 3 minutes timeout reset
+                },
+                async openRunLogs() {
+                    this.logModalOpen = true;
+                    this.runLogData = "로그 데이터를 불러오는 중입니다...";
+                    try {
+                        const res = await fetch(`${API_BASE}/viewrunlogs?run_id=${this.selectedRunId}`);
+                        const result = await res.json();
+                        this.runLogData = result.log_output;
+                    } catch (e) {
+                        console.error("Failed to fetch run logs", e);
+                        this.runLogData = "로그를 불러오는데 실패했습니다.";
+                    }
+                }
+            }
+        }).mount('#app')
+    </script>
+</body>
+
+</html>

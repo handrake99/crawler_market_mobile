@@ -2,6 +2,7 @@ import requests
 import logging
 from typing import List, Dict, Any
 import random
+from app_store_scraper import AppStore
 
 # Configure logging
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
@@ -77,6 +78,35 @@ class StoreScraper:
                     
         logging.info(f"Gathered a raw pool of {len(targets)} unique iOS apps for LLM filtering.")
         return targets
+
+    def get_app_reviews(self, app_id: str, app_title: str) -> List[Dict[str, Any]]:
+        logging.info(f"Fetching reviews for iOS app: {app_title} ({app_id})")
+        
+        # app_store_scraper requires the app_name (cleaned title) and app_id
+        # Heuristic to clean title representing the path part in iTunes url
+        safe_title = ''.join(e for e in app_title.split('-')[0].split(':')[0] if e.isalnum() or e == ' ').strip().replace(' ', '-').lower()
+        if not safe_title:
+            safe_title = "app"
+            
+        try:
+            ios_app = AppStore(country='us', app_name=safe_title, app_id=int(app_id))
+            ios_app.review(how_many=150) # Fetch a batch to filter negative ones
+            
+            negative_reviews = []
+            for review in ios_app.reviews:
+                if review.get('rating', 5) <= 3: # 1 to 3 stars
+                    negative_reviews.append({
+                        'rating': review.get('rating'),
+                        'review': review.get('review'),
+                        'date': review.get('date').isoformat() if review.get('date') else None
+                    })
+                    if len(negative_reviews) >= 30:
+                        break
+                        
+            return negative_reviews
+        except Exception as e:
+            logging.error(f"Error fetching reviews for {app_title}: {e}")
+            return []
 
 if __name__ == "__main__":
     scraper = StoreScraper()

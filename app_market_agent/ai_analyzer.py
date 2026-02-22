@@ -84,6 +84,55 @@ class AIAnalyzer:
             logging.error(f"Error during app evaluation: {e}")
             return {"is_approved": False, "error": str(e)}
 
+    def evaluate_deep_reviews(self, app_title: str, negative_reviews: List[Dict[str, Any]]) -> Dict[str, str]:
+        """
+        Analyzes a list of negative reviews (1-3 stars) to extract key pain points and missing features.
+        """
+        if not negative_reviews:
+            return {
+                "pain_points": "수집된 부정적 리뷰가 없습니다.",
+                "requested_features": "제안된 신규 기능 내용이 없습니다."
+            }
+            
+        logging.info(f"Analyzing {len(negative_reviews)} negative reviews for {app_title}...")
+        
+        system_prompt = f"""
+앱 이름: '{app_title}'
+아래는 해당 앱에 대한 실제 유저들의 1~3점짜리 부정적/불만 리뷰 데이터 모음입니다.
+당신은 모바일 앱 기획자이자 역기획 분석가입니다.
+
+리뷰 데이터를 꼼꼼히 분석하여 다음 두 가지 질문에 답해주세요.
+결과는 반드시 JSON 포맷으로 작성해 주세요. (마크다운 포맷이 아닌 순수 JSON)
+
+{{
+    "pain_points": "사용자들이 현재 가장 크게 겪고 있는 명확한 문제점이나 불만 3가지를 정리해 주세요. (각 항목별로 줄바꿈 문자 '\\n'을 사용하여 번호를 매겨주세요)",
+    "requested_features": "리뷰에서 사용자들이 강력하게 원하고 있거나, 경쟁 앱에 비해 부족하다고 지적되는 핵심 기능 3가지를 도출해 주세요. (줄바꿈 문자 '\\n' 사용)"
+}}
+        
+리뷰 데이터:
+{negative_reviews}
+"""
+        try:
+            response_text = self._safe_generate(system_prompt)
+            # Remove Markdown code blocks if they exist
+            if response_text.startswith("```json"):
+                response_text = response_text.replace("```json\n", "")
+            if response_text.startswith("```"):
+                response_text = response_text.replace("```\n", "")
+            response_text = response_text.replace("```", "").strip()
+            
+            result = json.loads(response_text)
+            return {
+                "pain_points": result.get("pain_points", "추출 실패"),
+                "requested_features": result.get("requested_features", "추출 실패")
+            }
+        except Exception as e:
+            logging.error(f"Error during deep review analysis: {e}")
+            return {
+                "pain_points": f"분석 중 에러 발생: {e}",
+                "requested_features": "분석 실패"
+            }
+
 if __name__ == "__main__":
     analyzer = AIAnalyzer()
     

@@ -261,148 +261,185 @@
 
                                 <!-- Country Tabs -->
                                 <div class="flex space-x-2 border-b border-gray-200 mb-6">
-                                    <button v-for="c in getAppCountries(selectedApp)" :key="'tab_'+c"
-                                        @click="activeCountryTab = c"
+                                    <button v-for="c in ['us', 'kr']" :key="'tab_'+c" @click="activeCountryTab = c"
                                         class="px-4 py-2 text-sm font-bold uppercase rounded-t-lg transition-colors border-b-2 -mb-px"
                                         :class="activeCountryTab === c ? 'border-gray-900 text-gray-900 bg-gray-50' : 'border-transparent text-gray-500 hover:text-gray-700 hover:bg-gray-100'">
                                         <span v-if="c==='us'">🇺🇸 US</span>
                                         <span v-if="c==='kr'">🇰🇷 KR</span>
-                                        <span v-if="c!=='us' && c!=='kr'">{{ c }}</span>
                                     </button>
                                 </div>
 
-                                <div class="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
-                                    <div class="bg-gray-50 p-3 rounded border border-gray-100 text-center">
-                                        <p class="text-xs text-gray-500 mb-1">별점 및 리뷰</p>
-                                        <p class="font-bold">⭐ {{ getAppCountryMeta(selectedApp,
-                                            activeCountryTab).average_rating ?
-                                            Number(getAppCountryMeta(selectedApp,
-                                            activeCountryTab).average_rating).toFixed(1)
-                                            : 'N/A' }}
-                                            <span class="text-xs font-normal">({{ getAppCountryMeta(selectedApp,
-                                                activeCountryTab).rating_count ?
+                                <div v-if="!selectedApp.country_data || !selectedApp.country_data[activeCountryTab]">
+                                    <div
+                                        class="text-center py-16 bg-gray-50 border border-dashed border-gray-300 rounded-lg mb-6">
+                                        <p class="text-gray-500 mb-4">해당 국가({{ activeCountryTab.toUpperCase() }})의 앱 스토어
+                                            정보가 아직 수집되지 않았습니다.</p>
+                                        <button @click="fetchCountryInfo(activeCountryTab)"
+                                            :disabled="isFetchingCountry"
+                                            class="bg-black hover:bg-gray-800 text-white font-bold py-2 px-6 rounded shadow-sm transition disabled:opacity-50 text-sm">
+                                            {{ activeCountryTab.toUpperCase() }} 스토어 기본 정보 조회하기
+                                        </button>
+                                    </div>
+                                </div>
+                                <div v-else-if="selectedApp.country_data[activeCountryTab].not_found">
+                                    <div
+                                        class="bg-red-50 p-6 rounded-lg border border-red-100 shadow-sm text-center mb-6">
+                                        <h4 class="font-bold text-red-800 mb-2 text-lg">해당 국가 스토어 미출시</h4>
+                                        <p class="text-sm text-red-700">이 앱은 {{ activeCountryTab.toUpperCase() }} 지역
+                                            앱스토어에 등록되어 있지 않습니다.</p>
+                                    </div>
+                                </div>
+                                <div v-else>
+
+                                    <div class="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
+                                        <div class="bg-gray-50 p-3 rounded border border-gray-100 text-center">
+                                            <p class="text-xs text-gray-500 mb-1">별점 및 리뷰</p>
+                                            <p class="font-bold">⭐ {{ getAppCountryMeta(selectedApp,
+                                                activeCountryTab).average_rating ?
+                                                Number(getAppCountryMeta(selectedApp,
+                                                activeCountryTab).average_rating).toFixed(1)
+                                                : 'N/A' }}
+                                                <span class="text-xs font-normal">({{ getAppCountryMeta(selectedApp,
+                                                    activeCountryTab).rating_count ?
+                                                    getAppCountryMeta(selectedApp,
+                                                    activeCountryTab).rating_count.toLocaleString() : 0 }})</span>
+                                            </p>
+                                        </div>
+                                        <div class="bg-gray-50 p-3 rounded border border-gray-100 text-center">
+                                            <p class="text-xs text-gray-500 mb-1">가격</p>
+                                            <p class="font-bold">{{ getAppCountryMeta(selectedApp,
+                                                activeCountryTab).price
+                                                || 'N/A' }}</p>
+                                        </div>
+                                        <div class="bg-gray-50 p-3 rounded border border-gray-100 text-center">
+                                            <p class="text-xs text-gray-500 mb-1">출시일 (초회)</p>
+                                            <p class="font-bold">{{ getAppCountryMeta(selectedApp,
+                                                activeCountryTab).release_date ?
                                                 getAppCountryMeta(selectedApp,
-                                                activeCountryTab).rating_count.toLocaleString() : 0 }})</span>
-                                        </p>
-                                    </div>
-                                    <div class="bg-gray-50 p-3 rounded border border-gray-100 text-center">
-                                        <p class="text-xs text-gray-500 mb-1">가격</p>
-                                        <p class="font-bold">{{ getAppCountryMeta(selectedApp, activeCountryTab).price
-                                            || 'N/A' }}</p>
-                                    </div>
-                                    <div class="bg-gray-50 p-3 rounded border border-gray-100 text-center">
-                                        <p class="text-xs text-gray-500 mb-1">출시일 (초회)</p>
-                                        <p class="font-bold">{{ getAppCountryMeta(selectedApp,
-                                            activeCountryTab).release_date ?
-                                            getAppCountryMeta(selectedApp,
-                                            activeCountryTab).release_date.substring(0,10)
-                                            : 'N/A' }}</p>
-                                    </div>
-                                    <div class="bg-gray-50 p-3 rounded border border-gray-100 text-center">
-                                        <p class="text-xs text-gray-500 mb-1">용량 / 카테고리</p>
-                                        <p class="font-bold text-sm">{{ getAppCountryMeta(selectedApp,
-                                            activeCountryTab).file_size_bytes || 'Unknown' }} <br><span
-                                                class="text-xs font-normal text-gray-600">{{
-                                                getAppCountryMeta(selectedApp, activeCountryTab).primary_genre ||
-                                                'Unknown' }}</span></p>
-                                    </div>
-                                </div>
-
-                                <div class="mb-6">
-                                    <h3 class="text-lg font-bold text-gray-800 mb-2">앱 설명</h3>
-                                    <div
-                                        class="bg-gray-50 p-4 rounded text-sm text-gray-700 whitespace-pre-wrap max-h-48 overflow-y-auto border border-gray-200">
-                                        {{ getAppCountryMeta(selectedApp, activeCountryTab).description }}
-                                    </div>
-                                </div>
-
-                                <div>
-                                    <h3 class="text-lg font-bold text-gray-800 mb-2">1차 AI 선정 사유</h3>
-                                    <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
-                                        <div class="bg-indigo-50 border border-indigo-100 p-3 rounded">
-                                            <p class="text-xs font-bold text-indigo-800 mb-1">니치 마켓 여부</p>
-                                            <p class="text-sm text-gray-800">{{ selectedApp.eval_niche_market }}</p>
+                                                activeCountryTab).release_date.substring(0,10)
+                                                : 'N/A' }}</p>
                                         </div>
-                                        <div class="bg-green-50 border border-green-100 p-3 rounded">
-                                            <p class="text-xs font-bold text-green-800 mb-1">수익 모델 구조</p>
-                                            <p class="text-sm text-gray-800">{{ selectedApp.eval_revenue_model }}</p>
-                                        </div>
-                                        <div class="bg-blue-50 border border-blue-100 p-3 rounded">
-                                            <p class="text-xs font-bold text-blue-800 mb-1">기능 단순성</p>
-                                            <p class="text-sm text-gray-800">{{ selectedApp.eval_simplicity }}</p>
+                                        <div class="bg-gray-50 p-3 rounded border border-gray-100 text-center">
+                                            <p class="text-xs text-gray-500 mb-1">용량 / 카테고리</p>
+                                            <p class="font-bold text-sm">{{ getAppCountryMeta(selectedApp,
+                                                activeCountryTab).file_size_bytes || 'Unknown' }} <br><span
+                                                    class="text-xs font-normal text-gray-600">{{
+                                                    getAppCountryMeta(selectedApp, activeCountryTab).primary_genre ||
+                                                    'Unknown' }}</span></p>
                                         </div>
                                     </div>
-                                </div>
-                            </div>
 
-                            <!-- Deep Analysis Section -->
-                            <div class="bg-white rounded-lg shadow border border-gray-200 p-6">
-                                <div class="flex justify-between items-center mb-6 border-b border-gray-200 pb-2">
-                                    <h3 class="text-xl font-bold text-gray-900">🔍 심층 리뷰 역기획 분석</h3>
-                                    <span v-if="appDetailData.status === 'collected'"
-                                        class="text-xs bg-gray-100 text-gray-600 px-2 py-1 rounded border border-gray-200">
-                                        {{ formatDate(appDetailData.collection_date) }} 수집 완료됨
-                                    </span>
-                                </div>
-
-                                <!-- State: Not Collected -->
-                                <div v-if="appDetailData.status === 'not_collected' && !isCollecting"
-                                    class="text-center py-16 bg-gray-50 border border-dashed border-gray-300 rounded-lg">
-                                    <p class="text-gray-500 mb-4">아직 이 앱에 대한 불만 리뷰(1~3점) 크롤링 및 역기획 분석이 진행되지 않았습니다.</p>
-                                    <button @click="collectDetail" :disabled="isCollecting"
-                                        class="bg-black hover:bg-gray-800 text-white font-bold py-3 px-8 rounded-lg shadow-md transition disabled:opacity-50 text-lg">
-                                        심층 분석 수집 시작하기
-                                    </button>
-                                </div>
-
-                                <!-- State: Collecting -->
-                                <div v-else-if="isCollecting"
-                                    class="text-center py-16 bg-gray-50 border border-gray-200 rounded-lg animate-pulse">
-                                    <div
-                                        class="inline-block animate-spin rounded-full h-8 w-8 border-b-2 border-gray-900 mb-4">
-                                    </div>
-                                    <p class="text-gray-800 font-bold mb-2 text-lg">리뷰 크롤링 및 LLM 분석을 수행하고 있습니다...</p>
-                                    <p class="text-sm text-gray-500">API 호출 상황에 따라 약 10~30초 정도 소요될 수 있습니다.</p>
-                                </div>
-
-                                <!-- State: Collected & Ready -->
-                                <div v-else-if="appDetailData.status === 'collected'" class="space-y-6">
-                                    <div class="bg-red-50 p-5 rounded-lg border border-red-100 shadow-sm">
-                                        <h4 class="font-bold text-red-800 mb-3 border-b border-red-200 pb-2 text-lg">🚨
-                                            유저 불만 사항
-                                            (Pain Points)</h4>
-                                        <p class="text-sm text-gray-800 whitespace-pre-wrap leading-relaxed">{{
-                                            (appDetailData.country_data && appDetailData.country_data[activeCountryTab])
-                                            ? appDetailData.country_data[activeCountryTab].pain_points : '데이터 없음'
-                                            }}</p>
-                                    </div>
-
-                                    <div class="bg-yellow-50 p-5 rounded-lg border border-yellow-100 shadow-sm">
-                                        <h4
-                                            class="font-bold text-yellow-800 mb-3 border-b border-yellow-200 pb-2 text-lg">
-                                            💡 신규 기능
-                                            요구 (Requested Features)</h4>
-                                        <p class="text-sm text-gray-800 whitespace-pre-wrap leading-relaxed">{{
-                                            (appDetailData.country_data && appDetailData.country_data[activeCountryTab])
-                                            ? appDetailData.country_data[activeCountryTab].requested_features : '데이터 없음'
-                                            }}</p>
-                                    </div>
-
-                                    <div class="mt-8">
-                                        <h4 class="font-bold text-gray-800 mb-3">참고: 원문 리뷰 샘플 (크롤링된 1~3점 리뷰 일부)</h4>
+                                    <div class="mb-6">
+                                        <h3 class="text-lg font-bold text-gray-800 mb-2">앱 설명</h3>
                                         <div
-                                            class="max-h-60 overflow-y-auto border border-gray-200 rounded-lg bg-gray-50">
-                                            <ul class="divide-y divide-gray-200">
-                                                <li v-for="(review, index) in ((appDetailData.country_data && appDetailData.country_data[activeCountryTab]) ? appDetailData.country_data[activeCountryTab].raw_reviews_data : [])"
-                                                    :key="index" class="p-4 text-sm hover:bg-gray-100 transition">
-                                                    <span class="font-bold text-gray-900 mr-2">⭐️ {{ review.rating
-                                                        }}</span>
-                                                    <span class="text-gray-700">{{ review.review }}</span>
-                                                </li>
-                                            </ul>
+                                            class="bg-gray-50 p-4 rounded text-sm text-gray-700 whitespace-pre-wrap max-h-48 overflow-y-auto border border-gray-200">
+                                            {{ getAppCountryMeta(selectedApp, activeCountryTab).description }}
+                                        </div>
+                                    </div>
+
+                                    <div>
+                                        <h3 class="text-lg font-bold text-gray-800 mb-2">1차 AI 선정 사유</h3>
+                                        <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+                                            <div class="bg-indigo-50 border border-indigo-100 p-3 rounded">
+                                                <p class="text-xs font-bold text-indigo-800 mb-1">니치 마켓 여부</p>
+                                                <p class="text-sm text-gray-800">{{ selectedApp.eval_niche_market }}</p>
+                                            </div>
+                                            <div class="bg-green-50 border border-green-100 p-3 rounded">
+                                                <p class="text-xs font-bold text-green-800 mb-1">수익 모델 구조</p>
+                                                <p class="text-sm text-gray-800">{{ selectedApp.eval_revenue_model }}
+                                                </p>
+                                            </div>
+                                            <div class="bg-blue-50 border border-blue-100 p-3 rounded">
+                                                <p class="text-xs font-bold text-blue-800 mb-1">기능 단순성</p>
+                                                <p class="text-sm text-gray-800">{{ selectedApp.eval_simplicity }}</p>
+                                            </div>
                                         </div>
                                     </div>
                                 </div>
+
+                                <!-- Deep Analysis Section -->
+                                <div class="bg-white rounded-lg shadow border border-gray-200 p-6">
+                                    <div class="flex justify-between items-center mb-6 border-b border-gray-200 pb-2">
+                                        <h3 class="text-xl font-bold text-gray-900">🔍 심층 리뷰 역기획 분석</h3>
+                                        <span v-if="appDetailData.status === 'collected'"
+                                            class="text-xs bg-gray-100 text-gray-600 px-2 py-1 rounded border border-gray-200">
+                                            {{ formatDate(appDetailData.collection_date) }} 수집 완료됨
+                                        </span>
+                                    </div>
+
+                                    <!-- State: Not Collected -->
+                                    <div v-if="appDetailData.status === 'not_collected' && !isCollecting"
+                                        class="text-center py-16 bg-gray-50 border border-dashed border-gray-300 rounded-lg">
+                                        <p class="text-gray-500 mb-4">아직 이 앱에 대한 불만 리뷰(1~3점) 크롤링 및 역기획 분석이 진행되지 않았습니다.
+                                        </p>
+                                        <button @click="collectDetail" :disabled="isCollecting"
+                                            class="bg-black hover:bg-gray-800 text-white font-bold py-3 px-8 rounded-lg shadow-md transition disabled:opacity-50 text-lg">
+                                            심층 분석 수집 시작하기
+                                        </button>
+                                    </div>
+
+                                    <!-- State: Collecting -->
+                                    <div v-else-if="isCollecting"
+                                        class="text-center py-16 bg-gray-50 border border-gray-200 rounded-lg animate-pulse">
+                                        <div
+                                            class="inline-block animate-spin rounded-full h-8 w-8 border-b-2 border-gray-900 mb-4">
+                                        </div>
+                                        <p class="text-gray-800 font-bold mb-2 text-lg">리뷰 크롤링 및 LLM 분석을 수행하고 있습니다...
+                                        </p>
+                                        <p class="text-sm text-gray-500">API 호출 상황에 따라 약 10~30초 정도 소요될 수 있습니다.</p>
+                                    </div>
+
+                                    <!-- State: Collected & Ready -->
+                                    <div v-else-if="appDetailData.status === 'collected'" class="space-y-6">
+
+                                        <div class="flex justify-end mb-2">
+                                            <button @click="collectDetail" :disabled="isCollecting"
+                                                class="bg-gray-200 hover:bg-gray-300 text-gray-800 font-bold py-2 px-4 rounded shadow-sm transition disabled:opacity-50 text-sm">
+                                                ↻ 다시 수집 및 분석하기
+                                            </button>
+                                        </div>
+
+                                        <div class="bg-red-50 p-5 rounded-lg border border-red-100 shadow-sm">
+                                            <h4
+                                                class="font-bold text-red-800 mb-3 border-b border-red-200 pb-2 text-lg">
+                                                🚨
+                                                유저 불만 사항
+                                                (Pain Points)</h4>
+                                            <p class="text-sm text-gray-800 whitespace-pre-wrap leading-relaxed">{{
+                                                (appDetailData.country_data &&
+                                                appDetailData.country_data[activeCountryTab])
+                                                ? appDetailData.country_data[activeCountryTab].pain_points : '데이터 없음'
+                                                }}</p>
+                                        </div>
+
+                                        <div class="bg-yellow-50 p-5 rounded-lg border border-yellow-100 shadow-sm">
+                                            <h4
+                                                class="font-bold text-yellow-800 mb-3 border-b border-yellow-200 pb-2 text-lg">
+                                                💡 신규 기능
+                                                요구 (Requested Features)</h4>
+                                            <p class="text-sm text-gray-800 whitespace-pre-wrap leading-relaxed">{{
+                                                (appDetailData.country_data &&
+                                                appDetailData.country_data[activeCountryTab])
+                                                ? appDetailData.country_data[activeCountryTab].requested_features : '데이터 없음'
+                                                }}</p>
+                                        </div>
+
+                                        <div class="mt-8">
+                                            <h4 class="font-bold text-gray-800 mb-3">참고: 원문 리뷰 샘플 (크롤링된 1~3점 리뷰 일부)</h4>
+                                            <div
+                                                class="max-h-60 overflow-y-auto border border-gray-200 rounded-lg bg-gray-50">
+                                                <ul class="divide-y divide-gray-200">
+                                                    <li v-for="(review, index) in ((appDetailData.country_data && appDetailData.country_data[activeCountryTab]) ? appDetailData.country_data[activeCountryTab].raw_reviews_data : [])"
+                                                        :key="index" class="p-4 text-sm hover:bg-gray-100 transition">
+                                                        <span class="font-bold text-gray-900 mr-2">⭐️ {{ review.rating
+                                                            }}</span>
+                                                        <span class="text-gray-700">{{ review.review }}</span>
+                                                    </li>
+                                                </ul>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div> <!-- End of conditional v-else for data exists -->
                             </div>
                         </div>
                     </div>
@@ -514,6 +551,7 @@
                     selectedApp: null,
                     appDetailData: { status: 'not_collected' },
                     isCollecting: false,
+                    isFetchingCountry: false,
                     isRunningPipeline: false,
 
                     logModalOpen: false,
@@ -580,14 +618,42 @@
                 getAppCountryMeta(app, countryCode) {
                     if (!app || !app.country_data) return {};
                     if (countryCode && app.country_data[countryCode]) return app.country_data[countryCode];
-                    // Fallback to the first available country
-                    const keys = Object.keys(app.country_data);
-                    if (keys.length > 0) return app.country_data[keys[0]];
                     return {};
                 },
                 getAppCountries(app) {
                     if (!app || !app.country_data) return [];
                     return Object.keys(app.country_data);
+                },
+                async fetchCountryInfo(country) {
+                    this.isFetchingCountry = true;
+                    try {
+                        const res = await fetch(`${API_BASE}/fetch_country_info`, {
+                            method: 'POST',
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify({
+                                app_id: this.selectedApp.id,
+                                target_country: country
+                            })
+                        });
+                        const data = await res.json();
+                        if (data.status === 'success' || data.status === 'not_found') {
+                            if (!this.selectedApp.country_data) {
+                                this.selectedApp.country_data = {};
+                            }
+                            if (data.status === 'success') {
+                                this.selectedApp.country_data[country] = data.data;
+                            } else {
+                                this.selectedApp.country_data[country] = { not_found: true };
+                            }
+                        } else {
+                            alert('오류 발생: ' + data.message);
+                        }
+                    } catch (e) {
+                        alert('연결 오류가 발생했습니다.');
+                        console.error(e);
+                    } finally {
+                        this.isFetchingCountry = false;
+                    }
                 },
                 goHome() {
                     this.currentView = 'run_list';

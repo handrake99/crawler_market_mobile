@@ -1,6 +1,6 @@
 import requests
 import logging
-from typing import List, Dict, Any
+from typing import List, Dict, Any, Optional
 import random
 from app_store_scraper import AppStore
 
@@ -119,30 +119,79 @@ class StoreScraper:
         logging.info(f"Gathered a raw pool of {len(result_list)} unique iOS apps for LLM filtering across countries: {countries}")
         return result_list[:max_pool_size]
 
+    def lookup_app_by_id(self, app_store_id: str, country: str) -> Optional[Dict[str, Any]]:
+        """Looks up a specific app by ID in a specific regional store to fetch metadata."""
+        lookup_url = f"https://itunes.apple.com/lookup?id={app_store_id}&country={country}"
+        try:
+            response = requests.get(lookup_url, timeout=10)
+            data = response.json()
+            if 'results' in data and len(data['results']) > 0:
+                entry = data['results'][0]
+                
+                # Format to match _search_itunes_by_keyword output
+                return {
+                    'title': entry.get('trackName', ''),
+                    'description': entry.get('description', ''),
+                    'price': entry.get('formattedPrice', 'Free'),
+                    'url': entry.get('trackViewUrl', ''),
+                    'average_rating': float(entry.get('averageUserRating', 0.0)),
+                    'rating_count': int(entry.get('userRatingCount', 0)),
+                    'release_date': entry.get('releaseDate', ''),
+                    'file_size_bytes': str(entry.get('fileSizeBytes', '0')),
+                    'primary_genre': entry.get('primaryGenreName', '')
+                }
+            return None
+        except Exception as e:
+            logging.error(f"Error looking up app {app_store_id} in {country}: {e}")
+            return None
+
     def get_app_reviews(self, app_id: str, app_title: str, country: str = "us") -> List[Dict[str, Any]]:
         logging.info(f"Fetching reviews for iOS app: {app_title} ({app_id}) in {country}")
         
-        # app_store_scraper requires the app_name (cleaned title) and app_id
-        # Heuristic to clean title representing the path part in iTunes url
-        safe_title = ''.join(e for e in app_title.split('-')[0].split(':')[0] if e.isalnum() or e == ' ').strip().replace(' ', '-').lower()
-        if not safe_title:
-            safe_title = "app"
-            
+        negative_reviews = []
         try:
-            ios_app = AppStore(country=country, app_name=safe_title, app_id=int(app_id))
-            ios_app.review(how_many=150) # Fetch a batch to filter negative ones
-            
-            negative_reviews = []
-            for review in ios_app.reviews:
-                if review.get('rating', 5) <= 3: # 1 to 3 stars
-                    negative_reviews.append({
-                        'rating': review.get('rating'),
-                        'review': review.get('review'),
-                        'date': review.get('date').isoformat() if review.get('date') else None
-                    })
-                    if len(negative_reviews) >= 30:
+            # Fallback to direct iTunes RSS feed since app_store_scraper is blocking JSON decodes
+            for page in range(1, 11):  # Fetch up to 10 pages (500 reviews total max)
+                url = f"https://itunes.apple.com/{country}/rss/customerreviews/page={page}/id={app_id}/sortby=mostrecent/json"
+                response = requests.get(url, timeout=10)
+                if response.status_code != 200:
+                    break
+                    
+                data = response.json()
+                entries = data.get('feed', {}).get('entry', [])
+                
+                if not entries:
+                    break
+                    
+                if isinstance(entries, dict):
+                    entries = [entries]
+                    
+                for entry in entries:
+                    if 'im:rating' not in entry:
+                        continue # Skip app metadata entry
+                        
+                    rating_str = entry.get('im:rating', {}).get('label', '5')
+                    try:
+                        rating = int(rating_str)
+                    except ValueError:
+                        rating = 5
+                        
+                    if rating <= 3:
+                        review_text = entry.get('content', {}).get('label', '')
+                        date_str = entry.get('updated', {}).get('label', '')
+                        negative_reviews.append({
+                            'rating': rating,
+                            'review': review_text,
+                            'date': date_str
+                        })
+                        
+                    if len(negative_reviews) >= 100:
                         break
                         
+                if len(negative_reviews) >= 100:
+                    break
+                    
+            logging.info(f"[{app_id}] Fetched {len(negative_reviews)} negative reviews from RSS feed.")
             return negative_reviews
         except Exception as e:
             logging.error(f"Error fetching reviews for {app_title}: {e}")

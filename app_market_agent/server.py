@@ -128,6 +128,45 @@ def toggle_favorite(app_id: int, db: Session = Depends(get_db)):
     
     return {"status": "success", "is_favorite": app_item.is_favorite}
 
+class FetchCountryRequest(BaseModel):
+    app_id: int
+    target_country: str
+
+@app.post("/api/fetch_country_info")
+def fetch_country_info(request: FetchCountryRequest, db: Session = Depends(get_db)):
+    """Looks up and appends missing country metadata to an existing AppItem."""
+    app_id = request.app_id
+    target_country = request.target_country.lower()
+    
+    app_item = db.query(models.AppItem).filter(models.AppItem.id == app_id).first()
+    if not app_item:
+        raise HTTPException(status_code=404, detail="App not found")
+        
+    if app_item.platform.lower() != 'ios' or not app_item.app_store_id:
+        return {"status": "error", "message": "Only iOS apps with store IDs are supported for cross-country lookup."}
+        
+    country_data = json.loads(app_item.country_data) if app_item.country_data else {}
+    
+    # Check if we already have it or tried before
+    if target_country in country_data:
+        return {"status": "success", "message": "Information already exists.", "data": country_data[target_country]}
+        
+    lookup_results = store_scraper.lookup_app_by_id(app_item.app_store_id, target_country)
+    
+    if lookup_results:
+        country_data[target_country] = lookup_results
+        app_item.country_data = json.dumps(country_data, ensure_ascii=False)
+        db.commit()
+        db.refresh(app_item)
+        return {"status": "success", "data": lookup_results}
+    else:
+        # Save negative result to avoid redundant lookups
+        country_data[target_country] = {"not_found": True}
+        app_item.country_data = json.dumps(country_data, ensure_ascii=False)
+        db.commit()
+        db.refresh(app_item)
+        return {"status": "not_found", "message": "App not available in requested region."}
+
 @app.post("/api/collect_detail")
 def collect_detail(app_id: int, db: Session = Depends(get_db)):
     """Triggered by the UI to scrape 1-3 star reviews and run secondary AI analysis."""
@@ -135,10 +174,8 @@ def collect_detail(app_id: int, db: Session = Depends(get_db)):
     if not app_item:
         raise HTTPException(status_code=404, detail="App not found")
         
-    # Check if already collected
+    # Fetch existing detail (if recollecting, we overwrite it)
     existing_detail = db.query(models.AppDetail).filter(models.AppDetail.app_item_id == app_id).first()
-    if existing_detail:
-        return {"status": "success", "message": "Already collected", "detail_id": existing_detail.id}
         
     try:
         app_country_data = json.loads(app_item.country_data) if app_item.country_data else {}
@@ -166,16 +203,21 @@ def collect_detail(app_id: int, db: Session = Depends(get_db)):
                 "requested_features": requested_features
             }
         
-        # Save to DB
-        new_detail = models.AppDetail(
-            app_item_id=app_item.id,
-            country_data=json.dumps(detail_country_data, ensure_ascii=False)
-        )
-        db.add(new_detail)
-        db.commit()
-        db.refresh(new_detail)
-        
-        return {"status": "success", "message": "Data collected successfully", "detail_id": new_detail.id}
+        # Save to DB (Update if exists, insert if new)
+        if existing_detail:
+            existing_detail.country_data = json.dumps(detail_country_data, ensure_ascii=False)
+            db.commit()
+            db.refresh(existing_detail)
+            return {"status": "success", "message": "Data recollected successfully", "detail_id": existing_detail.id}
+        else:
+            new_detail = models.AppDetail(
+                app_item_id=app_item.id,
+                country_data=json.dumps(detail_country_data, ensure_ascii=False)
+            )
+            db.add(new_detail)
+            db.commit()
+            db.refresh(new_detail)
+            return {"status": "success", "message": "Data collected successfully", "detail_id": new_detail.id}
         
     except Exception as e:
         db.rollback()

@@ -2,6 +2,7 @@ import os
 import google.generativeai as genai
 from typing import List, Dict, Any
 import logging
+import json
 from dotenv import load_dotenv
 
 load_dotenv()
@@ -105,8 +106,8 @@ class AIAnalyzer:
 결과는 반드시 JSON 포맷으로 작성해 주세요. (마크다운 포맷이 아닌 순수 JSON)
 
 {{
-    "pain_points": "사용자들이 현재 가장 크게 겪고 있는 명확한 문제점이나 불만 3가지를 정리해 주세요. (각 항목별로 줄바꿈 문자 '\\n'을 사용하여 번호를 매겨주세요)",
-    "requested_features": "리뷰에서 사용자들이 강력하게 원하고 있거나, 경쟁 앱에 비해 부족하다고 지적되는 핵심 기능 3가지를 도출해 주세요. (줄바꿈 문자 '\\n' 사용)"
+    "pain_points": "사용자들이 현재 가장 크게 겪고 있는 명확한 문제점이나 불만들을 최대 10가지 이내로 정리해 주세요. (각 항목별로 줄바꿈 문자 '\\n'을 사용하여 번호를 매겨주세요)",
+    "requested_features": "리뷰에서 사용자들이 강력하게 원하고 있거나, 경쟁 앱에 비해 부족하다고 지적되는 핵심 기능들을 최대 10가지 이내로 도출해 주세요. (줄바꿈 문자 '\\n' 사용)"
 }}
         
 리뷰 데이터:

@@ -78,7 +78,7 @@ class AppMarketAgent:
             with open("daily_report.md", "w") as f:
                 f.write(markdown_content)
 
-    def run(self):
+    def run(self, keywords: list = None):
         import io
         log_capture_string = io.StringIO()
         ch = logging.StreamHandler(log_capture_string)
@@ -92,7 +92,7 @@ class AppMarketAgent:
         try:
             logging.info("Starting Daily App Market Analysis Cycle...")
             
-            target_store_apps = self.store_scraper.get_top_target_apps(max_pool_size=40)
+            target_store_apps = self.store_scraper.get_top_target_apps(max_pool_size=40, keywords=keywords)
             store_analysis_results = []
             
             models.Base.metadata.create_all(bind=engine)
@@ -129,6 +129,11 @@ class AppMarketAgent:
                         price=app.get('price', ''),
                         url=app.get('url', ''),
                         source_keyword=app.get('source_keyword', ''),
+                        average_rating=app.get('average_rating', 0.0),
+                        rating_count=app.get('rating_count', 0),
+                        release_date=app.get('release_date', ''),
+                        file_size_bytes=app.get('file_size_bytes', '0'),
+                        primary_genre=app.get('primary_genre', ''),
                         eval_niche_market=evaluation.get('niche_market', {}).get('reason', ''),
                         eval_revenue_model=evaluation.get('revenue_model', {}).get('reason', ''),
                         eval_simplicity=evaluation.get('simplicity', {}).get('reason', '')

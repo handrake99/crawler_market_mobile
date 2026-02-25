@@ -28,6 +28,13 @@ class AppItem(Base):
     url = Column(String)
     source_keyword = Column(String)
     
+    # Extended Metrics (V6)
+    average_rating = Column(Float, default=0.0)
+    rating_count = Column(Integer, default=0)
+    release_date = Column(String)
+    file_size_bytes = Column(String)
+    primary_genre = Column(String)
+    
     # AI Evaluation Reasons
     eval_niche_market = Column(String)
     eval_revenue_model = Column(String)

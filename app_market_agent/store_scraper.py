@@ -9,12 +9,15 @@ logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(
 
 class StoreScraper:
     def __init__(self):
-        # A curated list of keywords where indie developers thrive (Micro-SaaS, Niche solutions)
+        # A curated list of 20 diverse keywords where indie developers thrive (Micro-SaaS, Niche solutions)
         self.niche_keywords = [
             "ADHD Planner", "Visual Timer", "Minimalist tracker", 
             "Couple budget", "Neurodivergent focus", "Pomodoro study",
             "Freelance invoice", "Receipt tracker", "Pet journal",
-            "Digital detox", "Mood tracker"
+            "Digital detox", "Mood tracker", "Baby sleep",
+            "Intermittent fasting", "Plant care", "Habit builder",
+            "Language flashcards", "Workout logger", "Medication reminder",
+            "Subscription manager", "Flight tracker"
         ]
 
     def _search_itunes_by_keyword(self, keyword: str, limit: int = 15) -> List[Dict[str, Any]]:
@@ -42,6 +45,13 @@ class StoreScraper:
                     price = entry.get('price', 0.0)
                     formatted_price = entry.get('formattedPrice', 'Free')
                     
+                    # V6 Extended Metrics
+                    average_rating = float(entry.get('averageUserRating', 0.0))
+                    rating_count = int(entry.get('userRatingCount', 0))
+                    release_date = entry.get('releaseDate', '')
+                    file_size_bytes = str(entry.get('fileSizeBytes', '0'))
+                    primary_genre = entry.get('primaryGenreName', '')
+                    
                     apps_data.append({
                         'platform': 'ios',
                         'app_id': app_id,
@@ -49,22 +59,32 @@ class StoreScraper:
                         'description': description,
                         'price': formatted_price,
                         'url': entry.get('trackViewUrl', ''),
-                        'source_keyword': keyword
+                        'source_keyword': keyword,
+                        'average_rating': average_rating,
+                        'rating_count': rating_count,
+                        'release_date': release_date,
+                        'file_size_bytes': file_size_bytes,
+                        'primary_genre': primary_genre
                     })
         except Exception as e:
             logging.error(f"Error searching iOS for keyword '{keyword}': {e}")
             
         return apps_data
 
-    def get_top_target_apps(self, max_pool_size: int = 40) -> List[Dict[str, Any]]:
+    def get_top_target_apps(self, max_pool_size: int = 40, keywords: List[str] = None) -> List[Dict[str, Any]]:
         logging.info("Gathering initial app pool via Niche Keyword searches...")
         targets = []
         seen_ids = set()
         
-        # Randomize keyword order each day to explore different verticals
-        random.shuffle(self.niche_keywords)
+        # If specific keywords are provided, use them. Otherwise, pick random 3 from the 20 list.
+        if keywords and isinstance(keywords, list):
+            search_keywords = keywords
+            logging.info(f"Using provided keywords: {search_keywords}")
+        else:
+            search_keywords = random.sample(self.niche_keywords, min(3, len(self.niche_keywords)))
+            logging.info(f"Using randomly selected keywords: {search_keywords}")
         
-        for keyword in self.niche_keywords:
+        for keyword in search_keywords:
             if len(targets) >= max_pool_size:
                 break
                 

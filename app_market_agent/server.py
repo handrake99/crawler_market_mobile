@@ -3,9 +3,10 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse
 from sqlalchemy.orm import Session
 from sqlalchemy import desc
-from typing import List
+from typing import List, Optional
 import uvicorn
 import json
+from pydantic import BaseModel
 
 from database import engine, Base, get_db
 import models
@@ -62,6 +63,11 @@ def view_app_list(run_id: int, db: Session = Depends(get_db)):
         "price": app.price,
         "url": app.url,
         "source_keyword": app.source_keyword,
+        "average_rating": app.average_rating,
+        "rating_count": app.rating_count,
+        "release_date": app.release_date,
+        "file_size_bytes": app.file_size_bytes,
+        "primary_genre": app.primary_genre,
         "eval_niche_market": app.eval_niche_market,
         "eval_revenue_model": app.eval_revenue_model,
         "eval_simplicity": app.eval_simplicity
@@ -82,6 +88,11 @@ def view_all_apps(db: Session = Depends(get_db)):
         "price": app.price,
         "url": app.url,
         "source_keyword": app.source_keyword,
+        "average_rating": app.average_rating,
+        "rating_count": app.rating_count,
+        "release_date": app.release_date,
+        "file_size_bytes": app.file_size_bytes,
+        "primary_genre": app.primary_genre,
         "eval_niche_market": app.eval_niche_market,
         "eval_revenue_model": app.eval_revenue_model,
         "eval_simplicity": app.eval_simplicity
@@ -160,19 +171,26 @@ def collect_detail(app_id: int, db: Session = Depends(get_db)):
         db.rollback()
         raise HTTPException(status_code=500, detail=str(e))
 
+class PipelineRequest(BaseModel):
+    keywords: Optional[List[str]] = None
+
 @app.post("/api/run_pipeline")
-def run_pipeline(background_tasks: BackgroundTasks):
+def run_pipeline(background_tasks: BackgroundTasks, payload: PipelineRequest = None):
     """Triggers the AppMarketAgent to run manually in the background."""
-    def run_agent():
+    def run_agent(kwargs):
         try:
             from main import AppMarketAgent
             agent = AppMarketAgent()
-            agent.run()
+            agent.run(**kwargs)
         except Exception as e:
             print(f"Manual pipeline run failed: {e}")
 
-    background_tasks.add_task(run_agent)
+    kw = {}
+    if payload and payload.keywords:
+        kw['keywords'] = payload.keywords
+        
+    background_tasks.add_task(run_agent, kw)
     return {"status": "success", "message": "Pipeline started in background"}
 
 if __name__ == "__main__":
-    uvicorn.run("server:app", host="127.0.0.1", port=9000, reload=True)
+    uvicorn.run("server:app", host="0.0.0.0", port=9000, reload=True)

@@ -168,8 +168,8 @@ def fetch_country_info(request: FetchCountryRequest, db: Session = Depends(get_d
         return {"status": "not_found", "message": "App not available in requested region."}
 
 @app.post("/api/collect_detail")
-def collect_detail(app_id: int, db: Session = Depends(get_db)):
-    """Triggered by the UI to scrape 1-3 star reviews and run secondary AI analysis."""
+def collect_detail(app_id: int, target_country: str = None, db: Session = Depends(get_db)):
+    """Triggered by the UI to scrape 1-3 star reviews and run secondary AI analysis for a specific country."""
     app_item = db.query(models.AppItem).filter(models.AppItem.id == app_id).first()
     if not app_item:
         raise HTTPException(status_code=404, detail="App not found")
@@ -179,10 +179,16 @@ def collect_detail(app_id: int, db: Session = Depends(get_db)):
         
     try:
         app_country_data = json.loads(app_item.country_data) if app_item.country_data else {}
-        detail_country_data = {}
+        detail_country_data = json.loads(existing_detail.country_data) if (existing_detail and existing_detail.country_data) else {}
         
-        # Scrape and analyze per country
-        for country in app_country_data.keys():
+        # Determine which countries to scrape
+        countries_to_scrape = [target_country] if target_country else app_country_data.keys()
+        
+        # Scrape and analyze per selected country
+        for country in countries_to_scrape:
+            if country not in app_country_data:
+                continue # Skip if no base metadata exists for this country
+                
             if app_item.platform.lower() == 'ios' and app_item.app_store_id:
                 reviews = store_scraper.get_app_reviews(app_item.app_store_id, app_item.title, country=country)
             else:

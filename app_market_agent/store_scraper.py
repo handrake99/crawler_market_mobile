@@ -146,8 +146,8 @@ class StoreScraper:
 
     def get_app_reviews(self, app_id: str, app_title: str, country: str = "us") -> List[Dict[str, Any]]:
         logging.info(f"Fetching reviews for iOS app: {app_title} ({app_id}) in {country}")
-        
-        negative_reviews = []
+        # List to hold both negative and informative positive reviews
+        collected_reviews = []
         try:
             # Fallback to direct iTunes RSS feed since app_store_scraper is blocking JSON decodes
             for page in range(1, 11):  # Fetch up to 10 pages (500 reviews total max)
@@ -178,20 +178,32 @@ class StoreScraper:
                     if rating <= 3:
                         review_text = entry.get('content', {}).get('label', '')
                         date_str = entry.get('updated', {}).get('label', '')
-                        negative_reviews.append({
+                        collected_reviews.append({
                             'rating': rating,
                             'review': review_text,
-                            'date': date_str
+                            'date': date_str,
+                            'type': 'negative'
                         })
+                    elif rating == 5:
+                        review_text = entry.get('content', {}).get('label', '')
+                        # Only collect substantial 5-star reviews (e.g. >= 30 chars) for satisfaction points
+                        if len(review_text) >= 30:
+                            date_str = entry.get('updated', {}).get('label', '')
+                            collected_reviews.append({
+                                'rating': rating,
+                                'review': review_text,
+                                'date': date_str,
+                                'type': 'positive'
+                            })
                         
-                    if len(negative_reviews) >= 100:
+                    if len(collected_reviews) >= 150: # Increased limit to accommodate both types
                         break
                         
-                if len(negative_reviews) >= 100:
+                if len(collected_reviews) >= 150:
                     break
                     
-            logging.info(f"[{app_id}] Fetched {len(negative_reviews)} negative reviews from RSS feed.")
-            return negative_reviews
+            logging.info(f"[{app_id}] Fetched {len(collected_reviews)} reviews (mixed negative and long-positive) from RSS feed.")
+            return collected_reviews
         except Exception as e:
             logging.error(f"Error fetching reviews for {app_title}: {e}")
             return []

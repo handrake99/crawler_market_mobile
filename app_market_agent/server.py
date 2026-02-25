@@ -197,14 +197,17 @@ def collect_detail(app_id: int, target_country: str = None, db: Session = Depend
             # Run Deep AI Analysis on the collected reviews
             if reviews:
                 deep_analysis = ai_analyzer.evaluate_deep_reviews(app_item.title, reviews)
+                satisfaction_points = deep_analysis.get("satisfaction_points", "분석 실패")
                 pain_points = deep_analysis.get("pain_points", "분석 실패")
                 requested_features = deep_analysis.get("requested_features", "분석 실패")
             else:
+                satisfaction_points = "충분한 긍정적 리뷰(5점)를 찾지 못했거나 리뷰 API 에러가 발생했습니다."
                 pain_points = "부정적 리뷰(1~3점)를 충분히 찾지 못했거나 리뷰 API 에러가 발생했습니다."
                 requested_features = "수집된 데이터가 부족합니다."
                 
             detail_country_data[country] = {
                 "raw_reviews_data": reviews,
+                "satisfaction_points": satisfaction_points,
                 "pain_points": pain_points,
                 "requested_features": requested_features
             }

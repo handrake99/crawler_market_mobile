@@ -78,7 +78,7 @@ class AppMarketAgent:
             with open("daily_report.md", "w") as f:
                 f.write(markdown_content)
 
-    def run(self, keywords: list = None):
+    def run(self, keywords: list = None, countries: list = None):
         import io
         log_capture_string = io.StringIO()
         ch = logging.StreamHandler(log_capture_string)
@@ -92,7 +92,7 @@ class AppMarketAgent:
         try:
             logging.info("Starting Daily App Market Analysis Cycle...")
             
-            target_store_apps = self.store_scraper.get_top_target_apps(max_pool_size=40, keywords=keywords)
+            target_store_apps = self.store_scraper.get_top_target_apps(max_pool_size=40, keywords=keywords, countries=countries)
             store_analysis_results = []
             
             models.Base.metadata.create_all(bind=engine)
@@ -113,27 +113,31 @@ class AppMarketAgent:
                     if len(store_analysis_results) >= 15:
                         break
                         
-                    evaluation = self.ai_analyzer.evaluate_app_potential(app)
+                    import json
+                    
+                    # For AI evaluation, pick the 'us' data or first available country data
+                    country_dataobj = app.get('country_data', {})
+                    eval_data = country_dataobj.get('us')
+                    if not eval_data and country_dataobj:
+                        eval_data = list(country_dataobj.values())[0]
+                    
+                    if not eval_data:
+                        continue
+
+                    evaluation = self.ai_analyzer.evaluate_app_potential(eval_data)
                     if not evaluation.get("is_approved", False):
-                        logging.info(f"App {app.get('title')} rejected by LLM filter: {evaluation}")
+                        logging.info(f"App {eval_data.get('title')} rejected by LLM filter: {evaluation}")
                         continue
                     
-                    logging.info(f"App {app.get('title')} approved by LLM filter!")
+                    logging.info(f"App {eval_data.get('title')} approved by LLM filter!")
                     
                     app_item = models.AppItem(
                         run_history_id=run_record.id,
                         platform=app.get('platform', 'ios'),
-                        app_store_id=app.get('app_id', ''),
-                        title=app.get('title', ''),
-                        description=app.get('description', ''),
-                        price=app.get('price', ''),
-                        url=app.get('url', ''),
+                        app_store_id=app.get('app_store_id', ''),
+                        title=eval_data.get('title', 'Unknown'),
+                        country_data=json.dumps(country_dataobj),
                         source_keyword=app.get('source_keyword', ''),
-                        average_rating=app.get('average_rating', 0.0),
-                        rating_count=app.get('rating_count', 0),
-                        release_date=app.get('release_date', ''),
-                        file_size_bytes=app.get('file_size_bytes', '0'),
-                        primary_genre=app.get('primary_genre', ''),
                         eval_niche_market=evaluation.get('niche_market', {}).get('reason', ''),
                         eval_revenue_model=evaluation.get('revenue_model', {}).get('reason', ''),
                         eval_simplicity=evaluation.get('simplicity', {}).get('reason', '')

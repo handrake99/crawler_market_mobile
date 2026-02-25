@@ -26,3 +26,5 @@ Thumbs.db
 # Project generated/log files
 daily_report.md
 *.log
+app_market_agent/app_market.db
+test_pipeline.py

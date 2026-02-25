@@ -20,12 +20,11 @@ class StoreScraper:
             "Subscription manager", "Flight tracker"
         ]
 
-    def _search_itunes_by_keyword(self, keyword: str, limit: int = 15) -> List[Dict[str, Any]]:
-        logging.info(f"Searching iTunes App Store for keyword: '{keyword}'")
+    def _search_itunes_by_keyword(self, keyword: str, country: str = "us", limit: int = 15) -> List[Dict[str, Any]]:
+        logging.info(f"Searching iTunes App Store for keyword: '{keyword}' in country: '{country.upper()}'")
         
         # iTunes Search API endpoint
-        # entity=software ensures we only get apps
-        search_url = f"https://itunes.apple.com/search?term={requests.utils.quote(keyword)}&country=us&entity=software&limit={limit}"
+        search_url = f"https://itunes.apple.com/search?term={requests.utils.quote(keyword)}&country={country}&entity=software&limit={limit}"
         
         apps_data = []
         try:
@@ -53,7 +52,6 @@ class StoreScraper:
                     primary_genre = entry.get('primaryGenreName', '')
                     
                     apps_data.append({
-                        'platform': 'ios',
                         'app_id': app_id,
                         'title': title,
                         'description': description,
@@ -67,15 +65,15 @@ class StoreScraper:
                         'primary_genre': primary_genre
                     })
         except Exception as e:
-            logging.error(f"Error searching iOS for keyword '{keyword}': {e}")
+            logging.error(f"Error searching iOS for keyword '{keyword}' in {country}: {e}")
             
         return apps_data
 
-    def get_top_target_apps(self, max_pool_size: int = 40, keywords: List[str] = None) -> List[Dict[str, Any]]:
+    def get_top_target_apps(self, max_pool_size: int = 40, keywords: List[str] = None, countries: List[str] = None) -> List[Dict[str, Any]]:
         logging.info("Gathering initial app pool via Niche Keyword searches...")
-        targets = []
-        seen_ids = set()
-        
+        if not countries:
+            countries = ['us']
+            
         # If specific keywords are provided, use them. Otherwise, pick random 3 from the 20 list.
         if keywords and isinstance(keywords, list):
             search_keywords = keywords
@@ -84,23 +82,45 @@ class StoreScraper:
             search_keywords = random.sample(self.niche_keywords, min(3, len(self.niche_keywords)))
             logging.info(f"Using randomly selected keywords: {search_keywords}")
         
+        # Merge dictionary by app_id
+        merged_apps = {}
+        
         for keyword in search_keywords:
-            if len(targets) >= max_pool_size:
+            if len(merged_apps) >= max_pool_size:
                 break
                 
-            # Fetch 10 apps per keyword to cast a wide net
-            results = self._search_itunes_by_keyword(keyword, limit=10)
-            
-            for app in results:
-                if app['app_id'] not in seen_ids:
-                    targets.append(app)
-                    seen_ids.add(app['app_id'])
+            for country in countries:
+                results = self._search_itunes_by_keyword(keyword, country=country, limit=10)
+                
+                for app in results:
+                    app_id = app['app_id']
+                    if app_id not in merged_apps:
+                        merged_apps[app_id] = {
+                            "platform": "ios",
+                            "app_store_id": app_id,
+                            "source_keyword": keyword,
+                            "country_data": {}
+                        }
                     
-        logging.info(f"Gathered a raw pool of {len(targets)} unique iOS apps for LLM filtering.")
-        return targets
+                    merged_apps[app_id]["country_data"][country] = {
+                        "title": app['title'],
+                        "description": app['description'],
+                        "price": app['price'],
+                        "url": app['url'],
+                        "average_rating": app['average_rating'],
+                        "rating_count": app['rating_count'],
+                        "release_date": app['release_date'],
+                        "file_size_bytes": app['file_size_bytes'],
+                        "primary_genre": app['primary_genre']
+                    }
+                    
+        result_list = list(merged_apps.values())
+        random.shuffle(result_list)
+        logging.info(f"Gathered a raw pool of {len(result_list)} unique iOS apps for LLM filtering across countries: {countries}")
+        return result_list[:max_pool_size]
 
-    def get_app_reviews(self, app_id: str, app_title: str) -> List[Dict[str, Any]]:
-        logging.info(f"Fetching reviews for iOS app: {app_title} ({app_id})")
+    def get_app_reviews(self, app_id: str, app_title: str, country: str = "us") -> List[Dict[str, Any]]:
+        logging.info(f"Fetching reviews for iOS app: {app_title} ({app_id}) in {country}")
         
         # app_store_scraper requires the app_name (cleaned title) and app_id
         # Heuristic to clean title representing the path part in iTunes url
@@ -109,7 +129,7 @@ class StoreScraper:
             safe_title = "app"
             
         try:
-            ios_app = AppStore(country='us', app_name=safe_title, app_id=int(app_id))
+            ios_app = AppStore(country=country, app_name=safe_title, app_id=int(app_id))
             ios_app.review(how_many=150) # Fetch a batch to filter negative ones
             
             negative_reviews = []

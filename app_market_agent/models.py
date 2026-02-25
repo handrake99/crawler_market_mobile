@@ -22,18 +22,12 @@ class AppItem(Base):
     # Metadata
     platform = Column(String, index=True)
     app_store_id = Column(String, index=True)
-    title = Column(String)
-    description = Column(String)
-    price = Column(String)
-    url = Column(String)
+    title = Column(String, index=True)
+    # Store multi-country metrics as JSON string:
+    # {"us": {"title": "...", "description": "...", "price": "...", "average_rating": 4.5, "url": "...", "rating_count": 100, "release_date": "...", "file_size_bytes": "...", "primary_genre": "..."}, "kr": {...}}
+    country_data = Column(String, default="{}")
     source_keyword = Column(String)
-    
-    # Extended Metrics (V6)
-    average_rating = Column(Float, default=0.0)
-    rating_count = Column(Integer, default=0)
-    release_date = Column(String)
-    file_size_bytes = Column(String)
-    primary_genre = Column(String)
+    is_favorite = Column(Boolean, default=False)
     
     # AI Evaluation Reasons
     eval_niche_market = Column(String)
@@ -49,12 +43,9 @@ class AppDetail(Base):
     id = Column(Integer, primary_key=True, index=True)
     app_item_id = Column(Integer, ForeignKey("app_item.id"), unique=True)
     
-    # Stored 1-3 star reviews as JSON or concatenated string
-    raw_reviews_data = Column(String) 
-    
-    # Deep AI Analysis Results
-    pain_points = Column(String)
-    requested_features = Column(String)
+    # Store multi-country deep analysis as JSON string:
+    # {"us": {"raw_reviews_data": [...], "pain_points": "...", "requested_features": "..."}, "kr": {...}}
+    country_data = Column(String, default="{}")
     
     collection_date = Column(DateTime, default=datetime.utcnow)
     

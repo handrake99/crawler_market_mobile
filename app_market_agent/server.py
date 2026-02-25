@@ -67,6 +67,26 @@ def view_app_list(run_id: int, db: Session = Depends(get_db)):
         "eval_simplicity": app.eval_simplicity
     } for app in apps]
 
+@app.get("/api/viewallapps")
+def view_all_apps(db: Session = Depends(get_db)):
+    """Returns all apps discovered across all runs."""
+    apps = db.query(models.AppItem).order_by(desc(models.AppItem.id)).all()
+    
+    return [{
+        "id": app.id,
+        "run_history_id": app.run_history_id,
+        "platform": app.platform,
+        "app_store_id": app.app_store_id,
+        "title": app.title,
+        "description": app.description,
+        "price": app.price,
+        "url": app.url,
+        "source_keyword": app.source_keyword,
+        "eval_niche_market": app.eval_niche_market,
+        "eval_revenue_model": app.eval_revenue_model,
+        "eval_simplicity": app.eval_simplicity
+    } for app in apps]
+
 @app.get("/api/viewrunlogs")
 def view_run_logs(run_id: int, db: Session = Depends(get_db)):
     """Returns the raw execution logs for a specific run."""

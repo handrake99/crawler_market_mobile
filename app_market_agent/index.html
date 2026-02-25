@@ -43,94 +43,164 @@
             </div>
         </header>
 
-        <!-- Main Content -->
-        <main class="flex-grow max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 w-full">
+        <!-- Main Content with Sidebar Layout -->
+        <main class="flex-grow max-w-[90rem] mx-auto px-4 sm:px-6 lg:px-8 py-8 w-full flex space-x-8">
 
-            <!-- VIEW 1: Run History List -->
-            <transition name="fade" mode="out-in">
-                <div v-if="currentView === 'run_list'" key="runs">
-                    <div class="flex items-center justify-between mb-6">
-                        <h2 class="text-2xl font-bold text-gray-800">최근 분석 리포트 현황</h2>
-                        <button @click="triggerPipeline" :disabled="isRunningPipeline"
-                            class="bg-gray-800 hover:bg-black text-white font-bold py-2 px-4 rounded text-sm disabled:opacity-50 transition drop-shadow-sm">
-                            {{ isRunningPipeline ? '분석 실행 중...' : '신규 분석 강제 실행' }}
-                        </button>
-                    </div>
-                    <div class="bg-white shadow overflow-hidden sm:rounded-md border border-gray-200">
-                        <ul class="divide-y divide-gray-200">
-                            <li v-for="run in runs" :key="run.id">
-                                <a href="#" @click.prevent="openRun(run.id)"
-                                    class="block hover:bg-gray-50 p-4 sm:px-6 transition duration-150 ease-in-out">
-                                    <div class="flex items-center justify-between">
-                                        <p class="text-sm font-semibold text-gray-900 truncate">분석 회차 #{{ run.id }}</p>
-                                        <div class="ml-2 flex-shrink-0 flex">
-                                            <p
-                                                class="px-2 inline-flex text-xs leading-5 font-semibold rounded-full bg-gray-100 text-gray-800">
-                                                {{ run.total_apps_found }}개의 타겟 발견
-                                            </p>
-                                        </div>
-                                    </div>
-                                    <div class="mt-2 sm:flex sm:justify-between">
-                                        <div class="sm:flex">
-                                            <p class="flex items-center text-sm text-gray-500">
-                                                실행 일시: {{ formatDate(run.run_date) }}
-                                            </p>
-                                        </div>
-                                    </div>
-                                </a>
-                            </li>
-                            <li v-if="runs.length === 0" class="p-6 text-center text-gray-500">
-                                저장된 분석 내역이 없습니다. (파이프라인을 실행해주세요)
-                            </li>
-                        </ul>
-                    </div>
-                </div>
+            <!-- Sidebar Tabs -->
+            <aside class="w-64 flex-shrink-0">
+                <nav class="space-y-1">
+                    <a href="#" @click.prevent="switchTab('run_list')"
+                        :class="['group flex items-center px-3 py-2 text-sm font-medium rounded-md', currentView === 'run_list' || currentView === 'app_list' ? 'bg-gray-100 text-gray-900 border-l-4 border-gray-900' : 'text-gray-600 hover:bg-gray-50 hover:text-gray-900 border-l-4 border-transparent']">
+                        <span class="truncate">분석 리포트 현황</span>
+                    </a>
 
-                <!-- VIEW 2: App List for a Run -->
-                <div v-else-if="currentView === 'app_list'" key="apps">
-                    <div class="flex items-center justify-between mb-6">
-                        <div>
-                            <h2 class="text-2xl font-bold text-gray-800 inline-block mr-2">유망 타겟 앱 리스트</h2>
-                            <span class="text-sm text-gray-500">회차 #{{ selectedRunId }}</span>
-                        </div>
-                        <button @click="openRunLogs"
-                            class="bg-gray-200 hover:bg-gray-300 text-gray-800 font-bold py-2 px-4 rounded text-sm transition">
-                            Log 보기
-                        </button>
-                    </div>
+                    <a href="#" @click.prevent="switchTab('all_apps')"
+                        :class="['group flex items-center px-3 py-2 text-sm font-medium rounded-md', currentView === 'all_apps' ? 'bg-gray-100 text-gray-900 border-l-4 border-gray-900' : 'text-gray-600 hover:bg-gray-50 hover:text-gray-900 border-l-4 border-transparent']">
+                        <span class="truncate">전체 수집 앱 모아보기</span>
+                    </a>
+                </nav>
+            </aside>
 
-                    <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-                        <div v-for="app in apps" :key="app.id"
-                            class="bg-white rounded-lg shadow border border-gray-200 p-5 flex flex-col hover:shadow-md transition">
-                            <div class="flex justify-between items-start mb-2">
-                                <h3 class="text-lg font-bold text-gray-900 line-clamp-1" :title="app.title">{{ app.title
-                                    }}</h3>
-                                <span class="bg-gray-800 text-white text-xs px-2 py-1 rounded">{{
-                                    app.platform.toUpperCase() }}</span>
-                            </div>
-                            <p class="text-xs text-gray-500 mb-3 truncate">출처: {{ app.source_keyword }} | ID: {{
-                                app.app_store_id }}</p>
-
-                            <p class="text-sm text-gray-600 mb-4 line-clamp-3 flex-grow">{{ app.description }}</p>
-
-                            <div
-                                class="bg-gray-50 rounded p-3 text-xs text-gray-700 mb-4 space-y-1 border border-gray-100">
-                                <p><span class="font-semibold">니치 마켓:</span> <span class="line-clamp-1"
-                                        :title="app.eval_niche_market">{{ app.eval_niche_market }}</span></p>
-                                <p><span class="font-semibold">수익 모델:</span> <span class="line-clamp-1"
-                                        :title="app.eval_revenue_model">{{ app.eval_revenue_model }}</span></p>
-                                <p><span class="font-semibold">단순성:</span> <span class="line-clamp-1"
-                                        :title="app.eval_simplicity">{{ app.eval_simplicity }}</span></p>
-                            </div>
-
-                            <button @click="openAppDetail(app)"
-                                class="w-full bg-black text-white py-2 rounded text-sm font-semibold hover:bg-gray-800 transition">
-                                상세 분석 보기
+            <!-- Dashboard Content Area -->
+            <section class="flex-1 min-w-0">
+                <!-- VIEW 1: Run History List -->
+                <transition name="fade" mode="out-in">
+                    <div v-if="currentView === 'run_list'" key="runs">
+                        <div class="flex items-center justify-between mb-6">
+                            <h2 class="text-2xl font-bold text-gray-800">최근 분석 리포트 현황</h2>
+                            <button @click="triggerPipeline" :disabled="isRunningPipeline"
+                                class="bg-gray-800 hover:bg-black text-white font-bold py-2 px-4 rounded text-sm disabled:opacity-50 transition drop-shadow-sm">
+                                {{ isRunningPipeline ? '분석 실행 중...' : '신규 분석 강제 실행' }}
                             </button>
                         </div>
+                        <div class="bg-white shadow overflow-hidden sm:rounded-md border border-gray-200">
+                            <ul class="divide-y divide-gray-200">
+                                <li v-for="run in runs" :key="run.id">
+                                    <a href="#" @click.prevent="openRun(run.id)"
+                                        class="block hover:bg-gray-50 p-4 sm:px-6 transition duration-150 ease-in-out">
+                                        <div class="flex items-center justify-between">
+                                            <p class="text-sm font-semibold text-gray-900 truncate">분석 회차 #{{ run.id }}
+                                            </p>
+                                            <div class="ml-2 flex-shrink-0 flex">
+                                                <p
+                                                    class="px-2 inline-flex text-xs leading-5 font-semibold rounded-full bg-gray-100 text-gray-800">
+                                                    {{ run.total_apps_found }}개의 타겟 발견
+                                                </p>
+                                            </div>
+                                        </div>
+                                        <div class="mt-2 sm:flex sm:justify-between">
+                                            <div class="sm:flex">
+                                                <p class="flex items-center text-sm text-gray-500">
+                                                    실행 일시: {{ formatDate(run.run_date) }}
+                                                </p>
+                                            </div>
+                                        </div>
+                                    </a>
+                                </li>
+                                <li v-if="runs.length === 0" class="p-6 text-center text-gray-500">
+                                    저장된 분석 내역이 없습니다. (파이프라인을 실행해주세요)
+                                </li>
+                            </ul>
+                        </div>
                     </div>
-                </div>
-            </transition>
+
+                    <!-- VIEW 2: App List for a Run -->
+                    <div v-else-if="currentView === 'app_list'" key="apps">
+                        <div class="flex items-center justify-between mb-6">
+                            <div>
+                                <div class="flex items-center space-x-2">
+                                    <button @click="currentView = 'run_list'" class="text-gray-500 hover:text-black">
+                                        &larr; 뒤로
+                                    </button>
+                                    <h2 class="text-2xl font-bold text-gray-800 inline-block">유망 타겟 앱 리스트</h2>
+                                </div>
+                                <span class="text-sm text-gray-500 ml-12">회차 #{{ selectedRunId }}</span>
+                            </div>
+                            <button @click="openRunLogs"
+                                class="bg-gray-200 hover:bg-gray-300 text-gray-800 font-bold py-2 px-4 rounded text-sm transition">
+                                Log 보기
+                            </button>
+                        </div>
+
+                        <div class="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-6">
+                            <div v-for="app in apps" :key="app.id"
+                                class="bg-white rounded-lg shadow border border-gray-200 p-5 flex flex-col hover:shadow-md transition">
+                                <div class="flex justify-between items-start mb-2">
+                                    <h3 class="text-lg font-bold text-gray-900 line-clamp-1" :title="app.title">{{
+                                        app.title
+                                        }}</h3>
+                                    <span class="bg-gray-800 text-white text-xs px-2 py-1 rounded">{{
+                                        app.platform.toUpperCase() }}</span>
+                                </div>
+                                <p class="text-xs text-gray-500 mb-3 truncate">출처: {{ app.source_keyword }} | ID: {{
+                                    app.app_store_id }}</p>
+
+                                <p class="text-sm text-gray-600 mb-4 line-clamp-3 flex-grow">{{ app.description }}</p>
+
+                                <div
+                                    class="bg-gray-50 rounded p-3 text-xs text-gray-700 mb-4 space-y-1 border border-gray-100">
+                                    <p><span class="font-semibold">니치 마켓:</span> <span class="line-clamp-1"
+                                            :title="app.eval_niche_market">{{ app.eval_niche_market }}</span></p>
+                                    <p><span class="font-semibold">수익 모델:</span> <span class="line-clamp-1"
+                                            :title="app.eval_revenue_model">{{ app.eval_revenue_model }}</span></p>
+                                    <p><span class="font-semibold">단순성:</span> <span class="line-clamp-1"
+                                            :title="app.eval_simplicity">{{ app.eval_simplicity }}</span></p>
+                                </div>
+
+                                <button @click="openAppDetail(app)"
+                                    class="w-full bg-black text-white py-2 rounded text-sm font-semibold hover:bg-gray-800 transition">
+                                    상세 분석 보기
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- VIEW 3: All Collected Apps -->
+                    <div v-else-if="currentView === 'all_apps'" key="allapps">
+                        <div class="flex items-center justify-between mb-6">
+                            <div>
+                                <h2 class="text-2xl font-bold text-gray-800 inline-block mr-2">전체 수집 앱 모아보기</h2>
+                                <span class="text-sm text-gray-500">지금까지 선별된 모든 유망 타겟 앱 (총 {{ allApps.length }}개)</span>
+                            </div>
+                        </div>
+
+                        <div class="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-6">
+                            <div v-for="app in allApps" :key="'all_' + app.id"
+                                class="bg-white rounded-lg shadow border border-gray-200 p-5 flex flex-col hover:shadow-md transition">
+                                <div class="flex justify-between items-start mb-2">
+                                    <h3 class="text-lg font-bold text-gray-900 line-clamp-1" :title="app.title">{{
+                                        app.title }}</h3>
+                                    <span class="bg-gray-800 text-white text-xs px-2 py-1 rounded">{{
+                                        app.platform.toUpperCase() }}</span>
+                                </div>
+                                <p class="text-xs text-gray-500 mb-3 truncate">
+                                    발견 회차: #{{ app.run_history_id }} | 출처: {{ app.source_keyword }}
+                                </p>
+
+                                <p class="text-sm text-gray-600 mb-4 line-clamp-3 flex-grow">{{ app.description }}</p>
+
+                                <div
+                                    class="bg-gray-50 rounded p-3 text-xs text-gray-700 mb-4 space-y-1 border border-gray-100">
+                                    <p><span class="font-semibold">니치 마켓:</span> <span class="line-clamp-1"
+                                            :title="app.eval_niche_market">{{ app.eval_niche_market }}</span></p>
+                                    <p><span class="font-semibold">수익 모델:</span> <span class="line-clamp-1"
+                                            :title="app.eval_revenue_model">{{ app.eval_revenue_model }}</span></p>
+                                    <p><span class="font-semibold">단순성:</span> <span class="line-clamp-1"
+                                            :title="app.eval_simplicity">{{ app.eval_simplicity }}</span></p>
+                                </div>
+
+                                <button @click="openAppDetail(app)"
+                                    class="w-full bg-black text-white py-2 rounded text-sm font-semibold hover:bg-gray-800 transition">
+                                    상세 분석 보기
+                                </button>
+                            </div>
+                            <div v-if="allApps.length === 0" class="col-span-full p-6 text-center text-gray-500">
+                                수집된 앱이 없습니다.
+                            </div>
+                        </div>
+                    </div>
+                </transition>
+            </section>
         </main>
 
         <!-- VIEW 3: App Detail Modal -->
@@ -261,9 +331,10 @@
         createApp({
             data() {
                 return {
-                    currentView: 'run_list', // 'run_list', 'app_list'
+                    currentView: 'run_list', // 'run_list', 'app_list', 'all_apps'
                     runs: [],
                     apps: [],
+                    allApps: [],
                     selectedRunId: null,
 
                     selectedApp: null,
@@ -296,6 +367,22 @@
                         this.runs = await res.json();
                     } catch (e) {
                         console.error("Failed to fetch runs", e);
+                    }
+                },
+                async fetchAllApps() {
+                    try {
+                        const res = await fetch(`${API_BASE}/viewallapps`);
+                        this.allApps = await res.json();
+                    } catch (e) {
+                        console.error("Failed to fetch all apps", e);
+                    }
+                },
+                switchTab(tabName) {
+                    this.currentView = tabName;
+                    if (tabName === 'run_list') {
+                        this.fetchRuns();
+                    } else if (tabName === 'all_apps') {
+                        this.fetchAllApps();
                     }
                 },
                 async openRun(runId) {

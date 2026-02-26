@@ -170,6 +170,12 @@
                                 <span class="text-sm text-gray-500">지금까지 선별된 모든 유망 타겟 앱 (총 {{ allApps.length }}개)</span>
                             </div>
                             <div class="flex items-center">
+                                <!-- Filter Button -->
+                                <button @click="filterModalOpen = true"
+                                    class="text-gray-600 hover:text-black flex items-center space-x-1 mr-6">
+                                    <span class="text-xl">🔍</span>
+                                    <span class="text-sm font-bold">필터</span>
+                                </button>
                                 <label class="flex items-center cursor-pointer">
                                     <div class="relative">
                                         <!-- input -->
@@ -249,11 +255,18 @@
                                         <h2 class="text-3xl font-bold text-gray-900 border-b border-gray-200 pb-2">
                                             {{ selectedApp.title }}
                                         </h2>
-                                        <button @click="toggleFavorite(selectedApp)"
-                                            class="ml-4 text-3xl focus:outline-none transition-transform hover:scale-110 drop-shadow-sm pb-2"
-                                            :title="selectedApp.is_favorite ? '즐겨찾기 해제' : '즐겨찾기 추가'">
-                                            {{ selectedApp.is_favorite ? '⭐' : '☆' }}
-                                        </button>
+                                        <div class="flex items-center space-x-2 ml-4">
+                                            <button @click="toggleFavorite(selectedApp)"
+                                                class="text-3xl focus:outline-none transition-transform hover:scale-110 drop-shadow-sm pb-2"
+                                                :title="selectedApp.is_favorite ? '즐겨찾기 해제' : '즐겨찾기 추가'">
+                                                {{ selectedApp.is_favorite ? '⭐' : '☆' }}
+                                            </button>
+                                            <button @click="toggleHide(selectedApp)"
+                                                class="text-2xl focus:outline-none transition-transform hover:scale-110 drop-shadow-sm pb-2 opacity-60 hover:opacity-100"
+                                                title="전체 수집 목록에서 이 앱 숨기기 (Hide)">
+                                                👁️
+                                            </button>
+                                        </div>
                                     </div>
                                     <span class="bg-gray-800 text-white text-sm px-3 py-1 rounded ml-4 shadow-sm">{{
                                         selectedApp.platform.toUpperCase() }}</span>
@@ -461,6 +474,68 @@
             </section>
         </main>
 
+        <!-- Filter Modal -->
+        <div v-if="filterModalOpen" class="fixed inset-0 z-50 overflow-y-auto" aria-labelledby="modal-title"
+            role="dialog" aria-modal="true">
+            <div class="flex items-end justify-center min-h-screen pt-4 px-4 pb-20 text-center sm:block sm:p-0">
+                <div class="fixed inset-0 bg-gray-500 bg-opacity-75 transition-opacity" @click="filterModalOpen = false"
+                    aria-hidden="true"></div>
+                <span class="hidden sm:inline-block sm:align-middle sm:h-screen" aria-hidden="true">&#8203;</span>
+                <div
+                    class="inline-block align-bottom bg-white rounded-lg text-left overflow-hidden shadow-xl transform transition-all sm:my-8 sm:align-middle sm:max-w-lg sm:w-full">
+                    <div class="bg-white px-4 pt-5 pb-4 sm:p-6 sm:pb-4">
+                        <div class="sm:flex sm:items-start">
+                            <div class="mt-3 text-center sm:mt-0 sm:text-left w-full">
+                                <h3 class="text-lg leading-6 font-bold text-gray-900 mb-4" id="modal-title">
+                                    필터 설정
+                                </h3>
+                                <div class="space-y-4">
+                                    <div>
+                                        <label class="block text-sm font-medium text-gray-700">출처 (키워드)</label>
+                                        <select v-model="appFilters.source"
+                                            class="mt-1 block w-full pl-3 pr-10 py-2 text-base border-gray-300 focus:outline-none focus:ring-gray-900 focus:border-gray-900 sm:text-sm rounded-md border shadow-sm">
+                                            <option value="all">전체</option>
+                                            <option v-for="src in uniqueSources" :key="src" :value="src">{{ src }}
+                                            </option>
+                                        </select>
+                                    </div>
+                                    <div>
+                                        <label class="block text-sm font-medium text-gray-700">출시 기간</label>
+                                        <select v-model="appFilters.duration"
+                                            class="mt-1 block w-full pl-3 pr-10 py-2 text-base border-gray-300 focus:outline-none focus:ring-gray-900 focus:border-gray-900 sm:text-sm rounded-md border shadow-sm">
+                                            <option value="all">전체</option>
+                                            <option value="1m">1개월 이내</option>
+                                            <option value="3m">3개월 이내</option>
+                                            <option value="6m">6개월 이내</option>
+                                            <option value="1y">1년 이내</option>
+                                            <option value="3y">3년 이내</option>
+                                        </select>
+                                    </div>
+                                    <div>
+                                        <label class="block text-sm font-medium text-gray-700">최소 리뷰 수 (US + KR
+                                            합계)</label>
+                                        <input type="number" v-model="appFilters.minReviews" placeholder="예: 100"
+                                            class="mt-1 block w-full px-3 py-2 text-base border-gray-300 focus:outline-none focus:ring-gray-900 focus:border-gray-900 sm:text-sm rounded-md border shadow-sm">
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="bg-gray-50 px-4 py-3 sm:px-6 sm:flex sm:flex-row-reverse">
+                        <button type="button" @click="filterModalOpen = false"
+                            class="w-full inline-flex justify-center rounded-md border border-transparent shadow-sm px-4 py-2 bg-black text-base font-medium text-white hover:bg-gray-800 focus:outline-none sm:ml-3 sm:w-auto sm:text-sm transition">
+                            조회 적용하기
+                        </button>
+                        <button type="button"
+                            @click="appFilters = {source: 'all', duration: 'all', minReviews: ''}; filterModalOpen = false"
+                            class="mt-3 w-full inline-flex justify-center rounded-md border border-gray-300 shadow-sm px-4 py-2 bg-white text-base font-medium text-gray-700 hover:bg-gray-50 focus:outline-none sm:mt-0 sm:ml-3 sm:w-auto sm:text-sm transition">
+                            초기화
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
+
         <!-- VIEW 5: Log Modal -->
         <div v-if="logModalOpen" class="fixed inset-0 z-20 overflow-y-auto" aria-labelledby="modal-title" role="dialog"
             aria-modal="true">
@@ -587,6 +662,14 @@
                     // V8: Favorites
                     showFavoritesOnly: false,
 
+                    // V13: Filters
+                    filterModalOpen: false,
+                    appFilters: {
+                        source: 'all',
+                        duration: 'all', // all, 1m, 3m, 6m, 1y, 3y
+                        minReviews: ''
+                    },
+
                     // V9: Multi-Country
                     selectedCountries: ['us'],
                     activeCountryTab: 'us',
@@ -596,10 +679,62 @@
             },
             computed: {
                 filteredAllApps() {
+                    let result = this.allApps;
+
                     if (this.showFavoritesOnly) {
-                        return this.allApps.filter(app => app.is_favorite);
+                        result = result.filter(app => app.is_favorite);
                     }
-                    return this.allApps;
+
+                    if (this.appFilters.source !== 'all') {
+                        result = result.filter(app => app.source_keyword === this.appFilters.source);
+                    }
+
+                    if (this.appFilters.duration !== 'all') {
+                        const now = new Date();
+                        result = result.filter(app => {
+                            let rDate = null;
+                            if (app.country_data && app.country_data['us'] && app.country_data['us'].release_date) {
+                                rDate = new Date(app.country_data['us'].release_date);
+                            } else if (app.country_data && app.country_data['kr'] && app.country_data['kr'].release_date) {
+                                rDate = new Date(app.country_data['kr'].release_date);
+                            }
+
+                            if (!rDate) return false;
+
+                            const diffMonths = (now.getFullYear() - rDate.getFullYear()) * 12 + (now.getMonth() - rDate.getMonth());
+
+                            switch (this.appFilters.duration) {
+                                case '1m': return diffMonths <= 1;
+                                case '3m': return diffMonths <= 3;
+                                case '6m': return diffMonths <= 6;
+                                case '1y': return diffMonths <= 12;
+                                case '3y': return diffMonths <= 36;
+                                default: return true;
+                            }
+                        });
+                    }
+
+                    if (this.appFilters.minReviews !== '') {
+                        const min = parseInt(this.appFilters.minReviews, 10);
+                        if (!isNaN(min)) {
+                            result = result.filter(app => {
+                                let totalReviews = 0;
+                                if (app.country_data && app.country_data['us']) {
+                                    totalReviews += (parseInt(app.country_data['us'].rating_count, 10) || 0);
+                                }
+                                if (app.country_data && app.country_data['kr']) {
+                                    totalReviews += (parseInt(app.country_data['kr'].rating_count, 10) || 0);
+                                }
+                                return totalReviews >= min;
+                            });
+                        }
+                    }
+
+                    return result;
+                },
+                uniqueSources() {
+                    const sources = new Set(this.allApps.map(app => app.source_keyword).filter(Boolean));
+                    return Array.from(sources).sort();
                 }
             },
             mounted() {
@@ -755,8 +890,33 @@
                             alert("즐겨찾기 상태 변경 실패: " + result.detail);
                         }
                     } catch (e) {
-                        alert("API 호출 중 오류가 발생했습니다.");
-                        console.error(e);
+                        console.error('Failed to toggle favorite', e);
+                    }
+                },
+                async toggleHide(app) {
+                    if (!confirm(`'${app.title}' 앱을 전체 목록에서 숨기시겠습니까?`)) return;
+
+                    try {
+                        const res = await fetch(`${API_BASE}/toggle_hide?app_id=${app.id}`, {
+                            method: 'POST'
+                        });
+                        const result = await res.json();
+                        if (result.status === 'success') {
+                            app.is_hidden = result.is_hidden;
+
+                            // Remove from allApps if hidden
+                            if (result.is_hidden) {
+                                this.allApps = this.allApps.filter(a => a.id !== app.id);
+                                if (this.currentView === 'app_detail' && !this.selectedRunId) {
+                                    alert("숨김 처리되었습니다. 전체 모아보기 목록에서 제외됩니다.");
+                                    this.currentView = 'all_apps'; // Go back to all_apps if we came from there
+                                } else {
+                                    alert("전체 리스트에서 숨김 처리되었습니다.");
+                                }
+                            }
+                        }
+                    } catch (e) {
+                        alert("오류 발생");
                     }
                 },
                 async collectDetail() {

@@ -28,6 +28,7 @@ class AppItem(Base):
     country_data = Column(String, default="{}")
     source_keyword = Column(String)
     is_favorite = Column(Boolean, default=False)
+    is_hidden = Column(Boolean, default=False)
     
     # AI Evaluation Reasons
     eval_niche_market = Column(String)

@@ -63,6 +63,7 @@ def view_app_list(run_id: int, db: Session = Depends(get_db)):
         "title": app.title,
         "source_keyword": app.source_keyword,
         "is_favorite": app.is_favorite,
+        "is_hidden": app.is_hidden,
         "country_data": json.loads(app.country_data) if app.country_data else {},
         "eval_niche_market": app.eval_niche_market,
         "eval_revenue_model": app.eval_revenue_model,
@@ -71,8 +72,8 @@ def view_app_list(run_id: int, db: Session = Depends(get_db)):
 
 @app.get("/api/viewallapps")
 def view_all_apps(db: Session = Depends(get_db)):
-    """Returns all apps discovered across all runs."""
-    apps = db.query(models.AppItem).order_by(desc(models.AppItem.id)).all()
+    """Returns all apps discovered across all runs, ignoring hidden apps."""
+    apps = db.query(models.AppItem).filter(models.AppItem.is_hidden == False).order_by(desc(models.AppItem.id)).all()
     
     return [{
         "id": app.id,
@@ -82,6 +83,7 @@ def view_all_apps(db: Session = Depends(get_db)):
         "title": app.title,
         "source_keyword": app.source_keyword,
         "is_favorite": app.is_favorite,
+        "is_hidden": app.is_hidden,
         "country_data": json.loads(app.country_data) if app.country_data else {},
         "eval_niche_market": app.eval_niche_market,
         "eval_revenue_model": app.eval_revenue_model,
@@ -127,6 +129,19 @@ def toggle_favorite(app_id: int, db: Session = Depends(get_db)):
     db.refresh(app_item)
     
     return {"status": "success", "is_favorite": app_item.is_favorite}
+
+@app.post("/api/toggle_hide")
+def toggle_hide(app_id: int, db: Session = Depends(get_db)):
+    """Toggles the 'is_hidden' status of an app."""
+    app_item = db.query(models.AppItem).filter(models.AppItem.id == app_id).first()
+    if not app_item:
+        raise HTTPException(status_code=404, detail="App not found")
+        
+    app_item.is_hidden = not app_item.is_hidden
+    db.commit()
+    db.refresh(app_item)
+    
+    return {"status": "success", "is_hidden": app_item.is_hidden}
 
 class FetchCountryRequest(BaseModel):
     app_id: int

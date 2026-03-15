@@ -16,7 +16,9 @@ class StoreScraper:
             "Digital detox", "Mood tracker", "Baby sleep",
             "Intermittent fasting", "Plant care", "Habit builder",
             "Language flashcards", "Workout logger", "Medication reminder",
-            "Subscription manager", "Flight tracker"
+            "Subscription manager", "Flight tracker",
+            "AI Assistant", "Character AI Companion", "Virtual Tutor AI",
+            "Smart Schedule Planner", "AI Meeting Summarizer", "Voice to Text Assistant"
         ]
 
     def _search_itunes_by_keyword(self, keyword: str, country: str = "us", limit: int = 15) -> List[Dict[str, Any]]:

@@ -23,6 +23,10 @@ venv.bak/
 ehthumbs.db
 Thumbs.db
 
+# IDE / Editor settings
+.idea/
+.vscode/
+
 # Project generated/log files
 daily_report.md
 *.log

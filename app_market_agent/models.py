@@ -29,6 +29,8 @@ class AppItem(Base):
     source_keyword = Column(String)
     is_favorite = Column(Boolean, default=False)
     is_hidden = Column(Boolean, default=False)
+    is_manually_added = Column(Boolean, default=False)
+    eval_note = Column(String, nullable=True)
     
     # AI Evaluation Reasons
     eval_niche_market = Column(String)

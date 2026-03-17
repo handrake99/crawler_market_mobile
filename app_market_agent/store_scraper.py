@@ -10,7 +10,7 @@ class StoreScraper:
     def __init__(self):
         # A curated list of 20 diverse keywords where indie developers thrive (Micro-SaaS, Niche solutions)
         self.niche_keywords = [
-            "ADHD Planner", "Visual Timer", "Minimalist tracker", 
+            "ADHD Planner", "Visual Timer", "Minimalist tracker",
             "Couple budget", "Neurodivergent focus", "Pomodoro study",
             "Freelance invoice", "Receipt tracker", "Pet journal",
             "Digital detox", "Mood tracker", "Baby sleep",
@@ -18,7 +18,10 @@ class StoreScraper:
             "Language flashcards", "Workout logger", "Medication reminder",
             "Subscription manager", "Flight tracker",
             "AI Assistant", "Character AI Companion", "Virtual Tutor AI",
-            "Smart Schedule Planner", "AI Meeting Summarizer", "Voice to Text Assistant"
+            "Smart Schedule Planner", "AI Meeting Summarizer", "Voice to Text Assistant",
+            "AI Companion", "Virtual Girlfriend", "Emotional Support AI",
+            "AI Roleplay Chat", "Mental Wellness Chatbot", "Character AI Chat",
+            "AI Friend Chat", "Anxiety Chat Support", "CBT Chatbot", "AI Avatar"
         ]
 
     def _search_itunes_by_keyword(self, keyword: str, country: str = "us", limit: int = 15) -> List[Dict[str, Any]]:

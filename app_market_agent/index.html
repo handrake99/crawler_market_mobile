@@ -58,6 +58,11 @@
                         :class="['group flex items-center px-3 py-2 text-sm font-medium rounded-md', currentView === 'all_apps' ? 'bg-gray-100 text-gray-900 border-l-4 border-gray-900' : 'text-gray-600 hover:bg-gray-50 hover:text-gray-900 border-l-4 border-transparent']">
                         <span class="truncate">전체 수집 앱 모아보기</span>
                     </a>
+
+                    <a href="#" @click.prevent="switchTab('search_app')"
+                        :class="['group flex items-center px-3 py-2 text-sm font-medium rounded-md', currentView === 'search_app' ? 'bg-gray-100 text-gray-900 border-l-4 border-gray-900' : 'text-gray-600 hover:bg-gray-50 hover:text-gray-900 border-l-4 border-transparent']">
+                        <span class="truncate">앱 직접 검색하기</span>
+                    </a>
                 </nav>
             </aside>
 
@@ -240,13 +245,56 @@
                         </div>
                     </div>
 
+                    <!-- VIEW 5: Search App -->
+                    <div v-else-if="currentView === 'search_app'" key="searchapp">
+                        <h2 class="text-2xl font-bold text-gray-800 mb-6">앱 직접 검색하기</h2>
+                        <div class="flex space-x-2 mb-6">
+                            <input v-model="searchTerm" @keyup.enter="searchApp" type="text"
+                                placeholder="앱 이름을 입력하세요 (예: Replika)"
+                                class="flex-1 border border-gray-300 rounded-md px-4 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-gray-400">
+                            <button @click="searchApp" :disabled="isSearching || !searchTerm.trim()"
+                                class="bg-gray-800 hover:bg-black text-white font-bold py-2 px-6 rounded text-sm disabled:opacity-50 transition">
+                                {{ isSearching ? '검색 중...' : '검색' }}
+                            </button>
+                        </div>
+                        <div v-if="searchResults.length > 0" class="bg-white shadow overflow-hidden sm:rounded-md border border-gray-200">
+                            <ul class="divide-y divide-gray-200">
+                                <li v-for="(app, index) in searchResults" :key="app.app_store_id" class="p-4 sm:px-6">
+                                    <div class="flex items-center justify-between">
+                                        <div class="flex-1 min-w-0">
+                                            <p class="text-sm font-semibold text-gray-900">{{ index + 1 }}. {{ app.title }}</p>
+                                            <p class="text-xs text-gray-500 mt-1">{{ app.primary_genre }} · {{ app.price }} · {{ app.average_rating ? app.average_rating.toFixed(1) + '점' : '평점 없음' }} ({{ app.rating_count }}개 리뷰)</p>
+                                            <p class="text-xs text-gray-400 mt-1 truncate">{{ app.description }}</p>
+                                        </div>
+                                        <div class="ml-4 flex-shrink-0">
+                                            <span v-if="addedAppIds.includes(app.app_store_id)" class="text-green-600 font-semibold text-sm">추가됨</span>
+                                            <button v-else @click="addAppManually(app)"
+                                                :disabled="addingAppId === app.app_store_id"
+                                                class="bg-gray-800 hover:bg-black text-white font-bold py-1 px-4 rounded text-sm disabled:opacity-50 transition">
+                                                {{ addingAppId === app.app_store_id ? '추가 중...' : '추가' }}
+                                            </button>
+                                        </div>
+                                    </div>
+                                </li>
+                            </ul>
+                        </div>
+                        <div v-else-if="searchDone && searchResults.length === 0" class="text-center py-16 bg-gray-50 border border-dashed border-gray-300 rounded-lg">
+                            <p class="text-gray-500">검색 결과가 없습니다.</p>
+                        </div>
+                    </div>
+
                     <!-- VIEW 4: App Detail Page -->
                     <div v-else-if="currentView === 'app_detail'" key="appdetail">
                         <div class="mb-6">
-                            <button @click="currentView = selectedRunId ? 'app_list' : 'all_apps'"
+                            <button @click="currentView = selectedRunId ? 'app_list' : (previousView || 'all_apps')"
                                 class="text-gray-500 hover:text-black mb-4 flex items-center">
                                 &larr; 목록으로 돌아가기
                             </button>
+
+                            <!-- Warning Banner for manually added apps -->
+                            <div v-if="selectedApp.is_manually_added" class="bg-orange-50 border border-orange-300 rounded-lg p-4 mb-6">
+                                <p class="text-sm text-orange-800 font-semibold">{{ selectedApp.eval_note || '⚠️ 이 앱은 Micro-SaaS 기준 평가를 거치지 않고 직접 추가되었습니다. 비교/분석 참고용으로만 사용하세요.' }}</p>
+                            </div>
 
                             <!-- Header Info -->
                             <div class="bg-white rounded-lg shadow border border-gray-200 p-6 mb-6">
@@ -350,8 +398,9 @@
                                         </div>
                                     </div>
 
-                                    <div>
+                                    <div :class="{ 'opacity-40 pointer-events-none': selectedApp.is_manually_added }">
                                         <h3 class="text-lg font-bold text-gray-800 mb-2">1차 AI 선정 사유</h3>
+                                        <p v-if="selectedApp.is_manually_added" class="text-xs text-gray-400 mb-2">직접 추가된 앱은 AI 평가가 수행되지 않았습니다.</p>
                                         <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
                                             <div class="bg-indigo-50 border border-indigo-100 p-3 rounded">
                                                 <p class="text-xs font-bold text-indigo-800 mb-1">니치 마켓 여부</p>
@@ -446,8 +495,7 @@
                                             <p class="text-sm text-gray-800 whitespace-pre-wrap leading-relaxed">{{
                                                 (appDetailData.country_data &&
                                                 appDetailData.country_data[activeCountryTab])
-                                                ? appDetailData.country_data[activeCountryTab].requested_features : '데이터
-                                                없음'
+                                                ? appDetailData.country_data[activeCountryTab].requested_features : '데이터 없음'
                                                 }}</p>
                                         </div>
 
@@ -677,7 +725,17 @@
                     selectedCountries: ['us'],
                     activeCountryTab: 'us',
 
-                    pipelineInterval: null
+                    pipelineInterval: null,
+
+                    previousView: null,
+
+                    // Search App
+                    searchTerm: '',
+                    searchResults: [],
+                    searchDone: false,
+                    isSearching: false,
+                    addingAppId: null,
+                    addedAppIds: []
                 }
             },
             computed: {
@@ -839,6 +897,9 @@
                         this.fetchRuns();
                     } else if (tabName === 'all_apps') {
                         this.fetchAllApps();
+                    } else if (tabName === 'search_app') {
+                        this.searchResults = [];
+                        this.searchDone = false;
                     }
                 },
                 async openRun(runId) {
@@ -853,6 +914,7 @@
                 },
                 async openAppDetail(app) {
                     this.selectedApp = app;
+                    this.previousView = this.currentView;
                     const countries = this.getAppCountries(app);
                     if (countries.length > 0) {
                         this.activeCountryTab = countries[0];
@@ -943,6 +1005,46 @@
                         console.error(e);
                     } finally {
                         this.isCollecting = false;
+                    }
+                },
+                async searchApp() {
+                    if (!this.searchTerm.trim()) return;
+                    this.isSearching = true;
+                    this.searchDone = false;
+                    this.searchResults = [];
+                    try {
+                        const res = await fetch(`${API_BASE}/search_app?term=${encodeURIComponent(this.searchTerm)}&country=us`);
+                        this.searchResults = await res.json();
+                    } catch (e) {
+                        console.error('Search failed', e);
+                        alert('검색 중 오류가 발생했습니다.');
+                    } finally {
+                        this.isSearching = false;
+                        this.searchDone = true;
+                    }
+                },
+                async addAppManually(app) {
+                    this.addingAppId = app.app_store_id;
+                    try {
+                        const res = await fetch(`${API_BASE}/add_app_manually`, {
+                            method: 'POST',
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify({ app_store_id: app.app_store_id, country: 'us' })
+                        });
+                        if (res.status === 201) {
+                            this.addedAppIds.push(app.app_store_id);
+                        } else if (res.status === 409) {
+                            alert('이미 추가된 앱입니다.');
+                            this.addedAppIds.push(app.app_store_id);
+                        } else {
+                            const data = await res.json();
+                            alert('추가 실패: ' + (data.detail || '알 수 없는 오류'));
+                        }
+                    } catch (e) {
+                        console.error('Add app failed', e);
+                        alert('앱 추가 중 오류가 발생했습니다.');
+                    } finally {
+                        this.addingAppId = null;
                     }
                 },
                 openKeywordModal() {

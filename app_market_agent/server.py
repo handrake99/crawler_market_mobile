@@ -32,6 +32,61 @@ store_scraper = StoreScraper()
 
 is_pipeline_running = False
 
+class AddAppManuallyRequest(BaseModel):
+    app_store_id: str
+    country: str = "us"
+
+@app.get("/api/search_app")
+def search_app(term: str, country: str = "us", db: Session = Depends(get_db)):
+    """Searches the iTunes App Store for apps matching the given term."""
+    results = store_scraper._search_itunes_by_keyword(term, country=country, limit=15)
+    return [{
+        "app_store_id": app['app_id'],
+        "title": app['title'],
+        "description": app['description'][:300],
+        "average_rating": app['average_rating'],
+        "rating_count": app['rating_count'],
+        "price": app['price'],
+        "primary_genre": app['primary_genre'],
+        "url": app['url']
+    } for app in results]
+
+@app.post("/api/add_app_manually", status_code=201)
+def add_app_manually(request: AddAppManuallyRequest, db: Session = Depends(get_db)):
+    """Adds an app directly without AI evaluation."""
+    existing = db.query(models.AppItem).filter(models.AppItem.app_store_id == request.app_store_id).first()
+    if existing:
+        raise HTTPException(status_code=409, detail="이미 수집된 앱입니다.")
+
+    lookup = store_scraper.lookup_app_by_id(request.app_store_id, request.country)
+    if not lookup:
+        raise HTTPException(status_code=404, detail="앱 스토어에서 해당 앱을 찾을 수 없습니다.")
+
+    country_data = {request.country: lookup}
+    eval_note = "⚠️ 이 앱은 Micro-SaaS 기준 평가를 거치지 않고 직접 추가되었습니다. 비교/분석 참고용으로만 사용하세요."
+
+    app_item = models.AppItem(
+        platform="ios",
+        app_store_id=request.app_store_id,
+        title=lookup.get('title', 'Unknown'),
+        country_data=json.dumps(country_data, ensure_ascii=False),
+        source_keyword="manual",
+        is_manually_added=True,
+        eval_note=eval_note
+    )
+    db.add(app_item)
+    db.commit()
+    db.refresh(app_item)
+
+    return {
+        "id": app_item.id,
+        "title": app_item.title,
+        "app_store_id": app_item.app_store_id,
+        "is_manually_added": app_item.is_manually_added,
+        "eval_note": app_item.eval_note,
+        "country_data": country_data
+    }
+
 @app.get("/")
 def serve_frontend():
     """Serves the main frontend Single Page Application (index.html)."""
@@ -64,6 +119,8 @@ def view_app_list(run_id: int, db: Session = Depends(get_db)):
         "source_keyword": app.source_keyword,
         "is_favorite": app.is_favorite,
         "is_hidden": app.is_hidden,
+        "is_manually_added": app.is_manually_added or False,
+        "eval_note": app.eval_note,
         "country_data": json.loads(app.country_data) if app.country_data else {},
         "eval_niche_market": app.eval_niche_market,
         "eval_revenue_model": app.eval_revenue_model,
@@ -84,6 +141,8 @@ def view_all_apps(db: Session = Depends(get_db)):
         "source_keyword": app.source_keyword,
         "is_favorite": app.is_favorite,
         "is_hidden": app.is_hidden,
+        "is_manually_added": app.is_manually_added or False,
+        "eval_note": app.eval_note,
         "country_data": json.loads(app.country_data) if app.country_data else {},
         "eval_niche_market": app.eval_niche_market,
         "eval_revenue_model": app.eval_revenue_model,
